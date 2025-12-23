@@ -262,24 +262,24 @@ CREATE TRIGGER update_cases_updated_at
 
 | 컬럼명 | 타입 | NULL | 기본값 | 설명 |
 |--------|------|------|--------|------|
-| id | SERIAL | NOT NULL | auto | 자동 증가 PK |
-| serial_number | VARCHAR(20) | NOT NULL | - | 법제처 판례일련번호 (UK) |
-| case_name | VARCHAR(200) | NOT NULL | - | 사건명 |
-| case_number | VARCHAR(50) | NOT NULL | - | 사건번호 |
-| decision_date | DATE | NOT NULL | - | 선고일자 |
-| decision_type | VARCHAR(20) | NULL | - | 선고/결정 등 |
-| court_id | INTEGER | NULL | - | 법원 FK |
-| case_type_id | INTEGER | NULL | - | 사건유형 FK |
-| judgment_type | VARCHAR(20) | NULL | - | 판결/결정/명령 |
-| holding | TEXT | NULL | - | 판시사항 |
-| summary | TEXT | NULL | - | 판결요지 |
-| full_text | TEXT | NULL | - | 판례내용 전문 |
-| reference_articles_raw | TEXT | NULL | - | 참조조문 원문 |
-| reference_cases_raw | TEXT | NULL | - | 참조판례 원문 |
-| search_text | TEXT | NULL | - | 검색용 통합 텍스트 |
-| source_url | VARCHAR(500) | NULL | - | 원본 URL |
-| created_at | TIMESTAMP | NOT NULL | now() | 생성일시 |
-| updated_at | TIMESTAMP | NOT NULL | now() | 수정일시 |
+| id | SERIAL | NOT NULL | auto | Auto increment PK |
+| serial_number | VARCHAR(20) | NOT NULL | - | Law office case serial number (UK) |
+| case_name | VARCHAR(200) | NOT NULL | - | Case name |
+| case_number | VARCHAR(50) | NOT NULL | - | Case number |
+| decision_date | DATE | NOT NULL | - | Decision date |
+| decision_type | VARCHAR(20) | NULL | - | Decision/ruling type |
+| court_id | INTEGER | NULL | - | Court FK |
+| case_type_id | INTEGER | NULL | - | Case type FK |
+| judgment_type | VARCHAR(20) | NULL | - | Judgment/decision/order type |
+| holding | TEXT | NULL | - | Court holding |
+| summary | TEXT | NULL | - | Judgment summary |
+| full_text | TEXT | NULL | - | Full case text |
+| reference_articles_raw | TEXT | NULL | - | Reference articles raw text |
+| reference_cases_raw | TEXT | NULL | - | Reference cases raw text |
+| search_text | TEXT | NULL | - | Integrated search text |
+| source_url | VARCHAR(500) | NULL | - | Source URL |
+| created_at | TIMESTAMP | NOT NULL | now() | Created datetime |
+| updated_at | TIMESTAMP | NOT NULL | now() | Updated datetime |
 
 ---
 

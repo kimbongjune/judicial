@@ -18,7 +18,7 @@ class LawAPIClient:
     사용 예시:
         async with LawAPIClient() as client:
             cases = await client.get_cases_list(search="손해배상", page=1)
-            case_detail = await client.get_case_detail(판례일련번호=12345)
+            case_detail = await client.get_case_detail(case_serial_number=12345)
     """
     
     BASE_URL = "https://www.law.go.kr/DRF"
@@ -154,19 +154,19 @@ class LawAPIClient:
             
         return await self._request("lawSearch.do", params)
     
-    async def get_case_detail(self, 판례일련번호: int) -> Dict[str, Any]:
+    async def get_case_detail(self, case_serial_number: int) -> Dict[str, Any]:
         """
         판례 상세 조회
         
         Args:
-            판례일련번호: 판례 고유 일련번호
+            case_serial_number: 판례 고유 일련번호
             
         Returns:
             판례 상세 정보
         """
         params = {
             "target": "prec",
-            "ID": 판례일련번호,
+            "ID": case_serial_number,
         }
         return await self._request("lawService.do", params)
     
@@ -206,19 +206,19 @@ class LawAPIClient:
             
         return await self._request("lawSearch.do", params)
     
-    async def get_constitutional_detail(self, 결정례일련번호: int) -> Dict[str, Any]:
+    async def get_constitutional_detail(self, decision_serial_number: int) -> Dict[str, Any]:
         """
         헌재결정례 상세 조회
         
         Args:
-            결정례일련번호: 결정례 고유 일련번호
+            decision_serial_number: 결정례 고유 일련번호
             
         Returns:
-            헌재결정례 상세 정보
+            결정례 상세 정보
         """
         params = {
             "target": "detc",
-            "ID": 결정례일련번호,
+            "ID": decision_serial_number,
         }
         return await self._request("lawService.do", params)
     
@@ -258,19 +258,19 @@ class LawAPIClient:
             
         return await self._request("lawSearch.do", params)
     
-    async def get_interpretation_detail(self, 법령해석례일련번호: int) -> Dict[str, Any]:
+    async def get_interpretation_detail(self, interpretation_serial_number: int) -> Dict[str, Any]:
         """
         법령해석례 상세 조회
         
         Args:
-            법령해석례일련번호: 법령해석례 고유 일련번호
+            interpretation_serial_number: 법령해석례 고유 일련번호
             
         Returns:
-            법령해석례 상세 정보
+            해석례 상세 정보
         """
         params = {
             "target": "expc",
-            "ID": 법령해석례일련번호,
+            "ID": interpretation_serial_number,
         }
         return await self._request("lawService.do", params)
 

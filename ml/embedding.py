@@ -79,19 +79,19 @@ class EmbeddingService:
         판례 데이터를 임베딩으로 변환
         
         Args:
-            case: 판례 딕셔너리 (사건명, 판시사항, 판결요지 등)
+            case: 판례 딕셔너리 (case_name, summary, gist 등)
             
         Returns:
             임베딩 벡터
         """
         parts = []
         
-        if case.get("사건명"):
-            parts.append(case["사건명"])
-        if case.get("판시사항"):
-            parts.append(case["판시사항"])
-        if case.get("판결요지"):
-            parts.append(case["판결요지"])
+        if case.get("case_name"):
+            parts.append(case["case_name"])
+        if case.get("summary"):
+            parts.append(case["summary"])
+        if case.get("gist"):
+            parts.append(case["gist"])
         
         text = " ".join(parts)
         if not text.strip():
@@ -112,12 +112,12 @@ class EmbeddingService:
         """
         parts = []
         
-        if decision.get("사건명"):
-            parts.append(decision["사건명"])
-        if decision.get("결정요지"):
-            parts.append(decision["결정요지"])
-        if decision.get("주문"):
-            parts.append(decision["주문"])
+        if decision.get("case_name"):
+            parts.append(decision["case_name"])
+        if decision.get("summary"):
+            parts.append(decision["summary"])
+        if decision.get("ruling"):
+            parts.append(decision["ruling"])
         
         text = " ".join(parts)
         if not text.strip():
@@ -137,12 +137,12 @@ class EmbeddingService:
         """
         parts = []
         
-        if interpretation.get("안건명"):
-            parts.append(interpretation["안건명"])
-        if interpretation.get("질의요지"):
-            parts.append(interpretation["질의요지"])
-        if interpretation.get("회답"):
-            parts.append(interpretation["회답"])
+        if interpretation.get("agenda_name"):
+            parts.append(interpretation["agenda_name"])
+        if interpretation.get("question_summary"):
+            parts.append(interpretation["question_summary"])
+        if interpretation.get("answer"):
+            parts.append(interpretation["answer"])
         
         text = " ".join(parts)
         if not text.strip():
