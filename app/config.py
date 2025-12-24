@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     law_api_base_url: str = "http://www.law.go.kr/DRF"
     law_api_rate_limit: int = 10000
     
-    # 데이터베이스 설정
-    database_url: str = "sqlite+aiosqlite:///./data/judicial.db"
+    # 데이터베이스 설정 (PostgreSQL)
+    # 로컬 개발환경: brew services로 시작한 PostgreSQL은 현재 macOS 사용자로 접속
+    database_url: str = "postgresql+asyncpg://gimbongjun@localhost:5432/judicial"
     database_pool_size: int = 5
     database_max_overflow: int = 10
     

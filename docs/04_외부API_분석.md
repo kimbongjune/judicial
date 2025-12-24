@@ -776,7 +776,296 @@ async def sync_new_precedents(from_date: str):
 
 ---
 
-## 10. 참고 링크
+## 10. 법령 API
+
+### 10.1 법령 목록 조회 API
+
+#### 엔드포인트
+
+```
+GET http://www.law.go.kr/DRF/lawSearch.do
+```
+
+#### 요청 파라미터
+
+| 파라미터 | 필수 | 타입 | 설명 | 예시 |
+|----------|------|------|------|------|
+| OC | ✅ | String | 인증키 | abc123 |
+| target | ✅ | String | 대상 유형 | `law` |
+| type | ✅ | String | 응답 형식 | `XML` |
+| query | | String | 검색어 (법령명) | 민법 |
+| display | | Integer | 페이지당 건수 (최대 100) | 100 |
+| page | | Integer | 페이지 번호 | 1 |
+
+#### 요청 예시
+
+```bash
+curl "http://www.law.go.kr/DRF/lawSearch.do?OC={API_KEY}&target=law&query=민법&display=3&type=XML"
+```
+
+#### 응답 예시 (XML)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<LawSearch>
+    <target>law</target>
+    <키워드>민법</키워드>
+    <totalCnt>9</totalCnt>
+    <page>1</page>
+    <law id="1">
+        <법령일련번호>188376</법령일련번호>
+        <현행연혁코드>현행</현행연혁코드>
+        <법령명한글>난민법</법령명한글>
+        <법령약칭명></법령약칭명>
+        <법령ID>011546</법령ID>
+        <공포일자>20161220</공포일자>
+        <공포번호>14408</공포번호>
+        <제개정구분명>일부개정</제개정구분명>
+        <소관부처코드>1270000</소관부처코드>
+        <소관부처명>법무부</소관부처명>
+        <법령구분명>법률</법령구분명>
+        <시행일자>20161220</시행일자>
+        <법령상세링크>/DRF/lawService.do?OC=nocdu112&amp;target=law&amp;MST=188376&amp;type=HTML</법령상세링크>
+    </law>
+</LawSearch>
+```
+
+#### 응답 필드
+
+| 필드명 | 타입 | 설명 | DB 매핑 |
+|--------|------|------|---------|
+| 법령일련번호 | String | 법제처 고유 ID | `laws.serial_number` |
+| 법령명한글 | String | 법령명 | `laws.name` |
+| 법령약칭명 | String | 법령 약칭 | `laws.short_name` |
+| 법령ID | String | 법령 ID | `laws.law_id` |
+| 공포일자 | String | 공포일 (YYYYMMDD) | `laws.promulgation_date` |
+| 시행일자 | String | 시행일 (YYYYMMDD) | `laws.enforcement_date` |
+| 소관부처명 | String | 소관 부처 | `laws.ministry` |
+| 법령구분명 | String | 법률/대통령령/부령 등 | `laws.law_type` |
+| 제개정구분명 | String | 제정/일부개정/전부개정 | `laws.revision_type` |
+| 현행연혁코드 | String | 현행/연혁 구분 | `laws.status` |
+
+---
+
+### 10.2 법령 본문 조회 API
+
+#### 엔드포인트
+
+```
+GET http://www.law.go.kr/DRF/lawService.do
+```
+
+#### 요청 파라미터
+
+| 파라미터 | 필수 | 타입 | 설명 | 예시 |
+|----------|------|------|------|------|
+| OC | ✅ | String | 인증키 | abc123 |
+| target | ✅ | String | 대상 유형 | `law` |
+| type | ✅ | String | 응답 형식 | `XML` |
+| MST | ✅ | String | 법령일련번호 | 188376 |
+
+#### 요청 예시
+
+```bash
+curl "http://www.law.go.kr/DRF/lawService.do?OC={API_KEY}&target=law&MST=188376&type=XML"
+```
+
+#### 응답 구조
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<법령>
+    <기본정보>
+        <법령ID>011546</법령ID>
+        <공포일자>20161220</공포일자>
+        <법령명_한글>난민법</법령명_한글>
+        <소관부처>법무부</소관부처>
+        <시행일자>20161220</시행일자>
+    </기본정보>
+    <조문>
+        <조문단위>
+            <조문번호>1</조문번호>
+            <조문제목>목적</조문제목>
+            <조문내용>제1조(목적) 이 법은...</조문내용>
+        </조문단위>
+        <!-- 추가 조문들 -->
+    </조문>
+</법령>
+```
+
+---
+
+## 11. 법령 연혁 API
+
+### 11.1 법령 연혁 목록 조회 API
+
+#### 엔드포인트
+
+```
+GET http://www.law.go.kr/DRF/lawSearch.do
+```
+
+#### 요청 파라미터
+
+| 파라미터 | 필수 | 타입 | 설명 | 예시 |
+|----------|------|------|------|------|
+| OC | ✅ | String | 인증키 | abc123 |
+| target | ✅ | String | 대상 유형 | `law` |
+| type | ✅ | String | 응답 형식 | `XML` |
+| query | | String | 법령명 | 민법 |
+| efYd | | String | 시행일자 기준 조회 | 20231201 |
+
+---
+
+## 12. 법령 용어 API
+
+### 12.1 법령 용어 목록 조회 API
+
+#### 엔드포인트
+
+```
+GET http://www.law.go.kr/DRF/lawSearch.do
+```
+
+#### 요청 파라미터
+
+| 파라미터 | 필수 | 타입 | 설명 | 예시 |
+|----------|------|------|------|------|
+| OC | ✅ | String | 인증키 | abc123 |
+| target | ✅ | String | 대상 유형 | `lsTrm` |
+| type | ✅ | String | 응답 형식 | `XML` |
+| query | | String | 용어 검색어 | 채권 |
+| display | | Integer | 페이지당 건수 (최대 100) | 100 |
+| page | | Integer | 페이지 번호 | 1 |
+
+#### 요청 예시
+
+```bash
+curl "http://www.law.go.kr/DRF/lawSearch.do?OC={API_KEY}&target=lsTrm&query=채권&display=10&type=XML"
+```
+
+#### 응답 필드
+
+| 필드명 | 타입 | 설명 | DB 매핑 |
+|--------|------|------|---------|
+| 용어일련번호 | String | 법제처 고유 ID | `law_terms.serial_number` |
+| 용어명 | String | 법령 용어명 | `law_terms.term` |
+| 용어정의 | String | 용어 해석/정의 | `law_terms.definition` |
+| 법령명 | String | 해당 용어가 포함된 법령 | `law_terms.law_name` |
+| 조문번호 | String | 해당 조문 번호 | `law_terms.article_number` |
+
+---
+
+### 12.2 법령 용어 본문 조회 API
+
+#### 엔드포인트
+
+```
+GET http://www.law.go.kr/DRF/lawService.do
+```
+
+#### 요청 파라미터
+
+| 파라미터 | 필수 | 타입 | 설명 | 예시 |
+|----------|------|------|------|------|
+| OC | ✅ | String | 인증키 | abc123 |
+| target | ✅ | String | 대상 유형 | `lsTrm` |
+| type | ✅ | String | 응답 형식 | `XML` |
+| ID | ✅ | String | 용어일련번호 | 12345 |
+
+---
+
+## 13. HTML Fallback 처리
+
+### 13.1 JSON/XML 응답 실패 시 HTML 크롤링
+
+일부 판례의 경우 JSON/XML API에서 "일치하는 판례가 없습니다" 오류가 발생할 수 있습니다.
+이 경우 HTML API를 통해 데이터를 추출합니다.
+
+#### HTML API 요청
+
+```bash
+# JSON 실패 응답
+curl "http://www.law.go.kr/DRF/lawService.do?OC={API_KEY}&target=prec&ID=347410&type=json"
+# 응답: {"Law": "일치하는 판례가 없습니다.  판례명을 확인하여 주십시오."}
+
+# HTML 대체 요청
+curl "http://www.law.go.kr/DRF/lawService.do?OC={API_KEY}&target=prec&ID=347410&type=HTML"
+# iframe으로 실제 페이지 임베딩됨
+```
+
+#### HTML 응답 구조
+
+```html
+<html>
+<body>
+<input type="hidden" id="precSeq" value="347410"/>
+<iframe src="https://www.law.go.kr/LSW/precInfoP.do?precSeq=347410&mode=0"></iframe>
+</body>
+</html>
+```
+
+#### 실제 판례 페이지 크롤링
+
+```python
+async def get_case_detail_html(case_id: int) -> Dict[str, Any]:
+    """HTML 페이지에서 판례 상세 정보 추출"""
+    url = f"https://www.law.go.kr/LSW/precInfoP.do?precSeq={case_id}&mode=0"
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            html = await response.text()
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            return {
+                "case_name": extract_case_name(soup),
+                "case_number": extract_case_number(soup),
+                "court_name": extract_court_name(soup),
+                "judgment_date": extract_judgment_date(soup),
+                "summary": extract_summary(soup),
+                "gist": extract_gist(soup),
+                "full_text": extract_full_text(soup),
+                "reference_provisions": extract_reference_provisions(soup),
+                "reference_cases": extract_reference_cases(soup),
+            }
+```
+
+### 13.2 사건번호 파싱 로직
+
+판례 제목에서 법원명과 사건번호를 추출하는 로직:
+
+```python
+import re
+
+def parse_case_title(title: str) -> Dict[str, str]:
+    """
+    판례 제목에서 법원명과 사건번호 추출
+    
+    예시: "서울고등법원-2022-누-38108" → {"court_name": "서울고등법원", "case_number": "2022누38108"}
+    """
+    # 패턴 1: "법원명-년도-종류-번호" 형식
+    pattern1 = r'^(.+법원)-(\d{4})-([가-힣]+)-(\d+)$'
+    match = re.match(pattern1, title)
+    if match:
+        court_name = match.group(1)
+        year = match.group(2)
+        case_type = match.group(3)
+        number = match.group(4)
+        case_number = f"{year}{case_type}{number}"
+        return {"court_name": court_name, "case_number": case_number}
+    
+    # 패턴 2: 일반 사건번호 "년도종류번호" 형식 (예: 2023다12345)
+    pattern2 = r'^(\d{4})([가-힣]+)(\d+)$'
+    match = re.match(pattern2, title)
+    if match:
+        return {"court_name": "", "case_number": title}
+    
+    return {"court_name": "", "case_number": title}
+```
+
+---
+
+## 14. 참고 링크
 
 - **API 포털**: https://open.law.go.kr/
 - **API 활용가이드**: https://open.law.go.kr/LSO/openApi/guideList.do

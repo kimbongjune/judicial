@@ -8,25 +8,20 @@
 
 | 항목 | 내용 |
 |------|------|
-| Base URL | `http://localhost:8000/api/v1` |
+| Base URL | `http://localhost:8000/api` |
 | 프로토콜 | HTTP/HTTPS |
 | 응답 형식 | JSON |
 | 인코딩 | UTF-8 |
-| API 문서 | `/docs` (Swagger UI), `/redoc` (ReDoc) |
+| API 문서 | `/api/docs` (Swagger UI), `/api/redoc` (ReDoc) |
 
 ### 1.2 공통 응답 구조
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "message": "성공",
-  "meta": {
-    "total": 100,
-    "page": 1,
-    "size": 20,
-    "total_pages": 5
-  }
+  "items": [ ... ],
+  "total": 100,
+  "page": 1,
+  "size": 20
 }
 ```
 
@@ -34,12 +29,7 @@
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "CASE_NOT_FOUND",
-    "message": "판례를 찾을 수 없습니다.",
-    "detail": "ID: 123456에 해당하는 판례가 존재하지 않습니다."
-  }
+  "detail": "에러 메시지"
 }
 ```
 
@@ -48,7 +38,6 @@
 | 코드 | 설명 |
 |------|------|
 | 200 | 성공 |
-| 201 | 생성됨 |
 | 400 | 잘못된 요청 |
 | 404 | 리소스 없음 |
 | 422 | 유효성 검증 실패 |
@@ -56,48 +45,47 @@
 
 ---
 
-## 2. 판례 검색 API
+## 2. 판례 API (`/api/cases`)
 
-### 2.1 키워드 검색
+### 2.1 판례 검색
 
-**판례를 키워드로 검색합니다.**
+**판례를 검색합니다. (키워드 + 필터)**
 
 ```
-GET /api/v1/cases/search
+GET /api/cases
 ```
 
 #### 요청 파라미터 (Query String)
 
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|------|--------|------|
-| q | string | ✅ | - | 검색어 |
-| court | string | - | - | 법원 필터 (comma separated) |
+| q | string | - | - | 검색어 |
+| court_name | string | - | - | 법원명 필터 |
 | case_type | string | - | - | 사건유형 필터 |
-| from_date | string | - | - | 시작일 (YYYY-MM-DD) |
-| to_date | string | - | - | 종료일 (YYYY-MM-DD) |
+| date_from | string | - | - | 시작일 (YYYY-MM-DD) |
+| date_to | string | - | - | 종료일 (YYYY-MM-DD) |
 | page | integer | - | 1 | 페이지 번호 |
-| size | integer | - | 20 | 페이지 크기 (max: 100) |
-| sort | string | - | relevance | 정렬 기준 (relevance, date_desc, date_asc) |
+| size | integer | - | 20 | 페이지 크기 |
+| sort_by | string | - | decision_date | 정렬 기준 |
+| order | string | - | desc | 정렬 순서 (asc, desc) |
 
 #### 요청 예시
 
 ```bash
-GET /api/v1/cases/search?q=손해배상&court=대법원&from_date=2023-01-01&page=1&size=20
+GET /api/cases?q=손해배상&court_name=대법원&date_from=2023-01-01&page=1&size=20
 ```
 
 #### 응답 예시
 
 ```json
 {
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": 12345,
-        "serial_number": "123456",
-        "case_name": "손해배상(기)",
-        "case_number": "2023다12345",
-        "decision_date": "2023-12-15",
+  "items": [
+    {
+      "id": 12345,
+      "serial_number": "123456",
+      "case_name": "손해배상(기)",
+      "case_number": "2023다12345",
+      "decision_date": "2023-12-15",
         "court_name": "대법원",
         "case_type": "민사",
         "judgment_type": "판결",

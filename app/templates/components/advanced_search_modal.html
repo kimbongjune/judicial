@@ -1,0 +1,291 @@
+<!-- 상세검색 모달 컴포넌트 -->
+<div x-data="advancedSearch()" x-cloak>
+    <!-- 상세검색 버튼 -->
+    <button 
+        @click="open = true"
+        class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center space-x-1"
+    >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+        <span>상세검색</span>
+    </button>
+    
+    <!-- 모달 배경 -->
+    <div 
+        x-show="open" 
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-black bg-opacity-50 z-40"
+        @click="open = false"
+    ></div>
+    
+    <!-- 모달 컨텐츠 -->
+    <div 
+        x-show="open"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform scale-95"
+        x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+        <div class="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+            <!-- 헤더 -->
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h2 class="text-xl font-bold text-gray-900">상세검색</h2>
+                <button @click="open = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- 검색 폼 -->
+            <form :action="formAction" method="GET" class="p-6 space-y-6">
+                <!-- 검색 조건 추가 영역 -->
+                <div class="space-y-4">
+                    <template x-for="(condition, index) in searchConditions" :key="index">
+                        <div class="flex items-center space-x-3">
+                            <!-- 필드 선택 -->
+                            <select 
+                                x-model="condition.field"
+                                class="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            >
+                                <option value="전체">전체</option>
+                                <option value="사건명">사건명</option>
+                                <option value="판결요지">판결요지</option>
+                                <option value="주문">주문</option>
+                                <option value="판사">판사</option>
+                                <option value="사건번호">사건번호</option>
+                                <option value="제외어">제외어</option>
+                            </select>
+                            
+                            <!-- 검색어 입력 -->
+                            <input 
+                                type="text" 
+                                x-model="condition.value"
+                                :name="condition.field === '전체' ? 'q' : condition.field"
+                                placeholder="검색어 입력"
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                            
+                            <!-- 삭제 버튼 -->
+                            <button 
+                                type="button"
+                                @click="removeCondition(index)"
+                                x-show="searchConditions.length > 1"
+                                class="text-gray-400 hover:text-red-500"
+                            >
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- 검색 조건 추가 버튼 -->
+                <button 
+                    type="button"
+                    @click="addCondition()"
+                    class="flex items-center text-blue-600 hover:text-blue-800 text-sm"
+                >
+                    <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    검색 조건 추가
+                </button>
+                
+                <!-- 법원 선택 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">법원</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="court in courts" :key="court.value">
+                            <label class="inline-flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    :value="court.value"
+                                    x-model="selectedCourts"
+                                    class="sr-only peer"
+                                >
+                                <span class="px-3 py-1.5 text-sm border border-gray-300 rounded-full cursor-pointer peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 hover:bg-gray-50 transition-colors"
+                                      x-text="court.label">
+                                </span>
+                            </label>
+                        </template>
+                    </div>
+                    <input type="hidden" name="court" :value="selectedCourts.join(',')">
+                </div>
+                
+                <!-- 사건종류 선택 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">사건종류</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="caseType in caseTypes" :key="caseType.value">
+                            <label class="inline-flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    :value="caseType.value"
+                                    x-model="selectedCaseTypes"
+                                    class="sr-only peer"
+                                >
+                                <span class="px-3 py-1.5 text-sm border border-gray-300 rounded-full cursor-pointer peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 hover:bg-gray-50 transition-colors"
+                                      x-text="caseType.label">
+                                </span>
+                            </label>
+                        </template>
+                    </div>
+                    <input type="hidden" name="case_type" :value="selectedCaseTypes.join(',')">
+                </div>
+                
+                <!-- 소송결과 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">소송결과</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="result in judgmentResults" :key="result.value">
+                            <label class="inline-flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    :value="result.value"
+                                    x-model="selectedResults"
+                                    class="sr-only peer"
+                                >
+                                <span class="px-3 py-1.5 text-sm border border-gray-300 rounded-full cursor-pointer peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 hover:bg-gray-50 transition-colors"
+                                      x-text="result.label">
+                                </span>
+                            </label>
+                        </template>
+                    </div>
+                    <input type="hidden" name="result" :value="selectedResults.join(',')">
+                </div>
+                
+                <!-- 기간 선택 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">기간</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <select 
+                                name="period"
+                                x-model="period"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">전체</option>
+                                <option value="1m">최근 1개월</option>
+                                <option value="3m">최근 3개월</option>
+                                <option value="6m">최근 6개월</option>
+                                <option value="1y">최근 1년</option>
+                                <option value="3y">최근 3년</option>
+                                <option value="5y">최근 5년</option>
+                                <option value="custom">직접입력</option>
+                            </select>
+                        </div>
+                        <div x-show="period === 'custom'" class="flex items-center space-x-2">
+                            <input 
+                                type="date" 
+                                name="from_date"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            >
+                            <span class="text-gray-500">~</span>
+                            <input 
+                                type="date" 
+                                name="to_date"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            >
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 버튼 영역 -->
+                <div class="flex justify-center space-x-4 pt-4 border-t border-gray-200">
+                    <button 
+                        type="submit"
+                        class="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                        검색
+                    </button>
+                    <button 
+                        type="button"
+                        @click="resetForm()"
+                        class="px-8 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                    >
+                        초기화
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function advancedSearch() {
+    return {
+        open: false,
+        formAction: '/cases',
+        period: '',
+        
+        // 검색 조건
+        searchConditions: [
+            { field: '전체', value: '' }
+        ],
+        
+        // 법원 목록
+        courts: [
+            { value: '대법원', label: '대법원' },
+            { value: '고등법원', label: '고등법원' },
+            { value: '특허법원', label: '특허법원' },
+            { value: '지방법원', label: '지방법원·행정법원·가정법원' },
+            { value: '헌법재판소', label: '헌법재판소' },
+            { value: '군사법원', label: '군사법원' },
+        ],
+        selectedCourts: [],
+        
+        // 사건종류 목록
+        caseTypes: [
+            { value: '민사', label: '민사' },
+            { value: '형사', label: '형사' },
+            { value: '행정', label: '행정' },
+            { value: '특허', label: '특허' },
+            { value: '가사', label: '가사' },
+            { value: '세무', label: '세무' },
+        ],
+        selectedCaseTypes: [],
+        
+        // 소송결과 목록
+        judgmentResults: [
+            { value: '원고패', label: '원고패' },
+            { value: '원고일부승', label: '원고일부승' },
+            { value: '원고승', label: '원고승' },
+            { value: '항소기각', label: '항소기각' },
+            { value: '상고기각', label: '상고기각' },
+            { value: '파기환송', label: '파기환송' },
+            { value: '각하판결', label: '각하판결' },
+            { value: '징역', label: '징역' },
+        ],
+        selectedResults: [],
+        
+        addCondition() {
+            this.searchConditions.push({ field: '전체', value: '' });
+        },
+        
+        removeCondition(index) {
+            if (this.searchConditions.length > 1) {
+                this.searchConditions.splice(index, 1);
+            }
+        },
+        
+        resetForm() {
+            this.searchConditions = [{ field: '전체', value: '' }];
+            this.selectedCourts = [];
+            this.selectedCaseTypes = [];
+            this.selectedResults = [];
+            this.period = '';
+        }
+    }
+}
+</script>

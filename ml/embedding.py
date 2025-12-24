@@ -2,8 +2,8 @@
 임베딩 서비스 - Sentence Transformers 기반
 한국어 법률 문서 임베딩 생성
 """
-import os
 from typing import List, Optional, Union
+from functools import lru_cache
 import numpy as np
 
 from app.config import settings
@@ -37,6 +37,11 @@ class EmbeddingService:
     def model(self):
         """모델 프로퍼티 (lazy loading)"""
         return self._load_model()
+    
+    @property
+    def dimension(self) -> int:
+        """임베딩 차원"""
+        return 768
     
     def encode(
         self,
@@ -95,58 +100,37 @@ class EmbeddingService:
         
         text = " ".join(parts)
         if not text.strip():
-            # 빈 텍스트 처리
-            return np.zeros(768, dtype=np.float32)
+            return np.zeros(self.dimension, dtype=np.float32)
         
         return self.encode(text)
     
     def encode_constitutional(self, decision: dict) -> np.ndarray:
-        """
-        헌재결정례 데이터를 임베딩으로 변환
-        
-        Args:
-            decision: 결정례 딕셔너리
-            
-        Returns:
-            임베딩 벡터
-        """
+        """헌재결정례 임베딩"""
         parts = []
-        
         if decision.get("case_name"):
             parts.append(decision["case_name"])
         if decision.get("summary"):
             parts.append(decision["summary"])
-        if decision.get("ruling"):
-            parts.append(decision["ruling"])
         
         text = " ".join(parts)
         if not text.strip():
-            return np.zeros(768, dtype=np.float32)
+            return np.zeros(self.dimension, dtype=np.float32)
         
         return self.encode(text)
     
-    def encode_interpretation(self, interpretation: dict) -> np.ndarray:
-        """
-        법령해석례 데이터를 임베딩으로 변환
-        
-        Args:
-            interpretation: 해석례 딕셔너리
-            
-        Returns:
-            임베딩 벡터
-        """
+    def encode_interpretation(self, interp: dict) -> np.ndarray:
+        """법령해석례 임베딩"""
         parts = []
-        
-        if interpretation.get("agenda_name"):
-            parts.append(interpretation["agenda_name"])
-        if interpretation.get("question_summary"):
-            parts.append(interpretation["question_summary"])
-        if interpretation.get("answer"):
-            parts.append(interpretation["answer"])
+        if interp.get("agenda_name"):
+            parts.append(interp["agenda_name"])
+        if interp.get("question_summary"):
+            parts.append(interp["question_summary"])
+        if interp.get("answer"):
+            parts.append(interp["answer"])
         
         text = " ".join(parts)
         if not text.strip():
-            return np.zeros(768, dtype=np.float32)
+            return np.zeros(self.dimension, dtype=np.float32)
         
         return self.encode(text)
 
@@ -156,7 +140,7 @@ _embedding_service: Optional[EmbeddingService] = None
 
 
 def get_embedding_service() -> EmbeddingService:
-    """임베딩 서비스 싱글톤 인스턴스 반환"""
+    """임베딩 서비스 싱글톤 반환"""
     global _embedding_service
     if _embedding_service is None:
         _embedding_service = EmbeddingService()

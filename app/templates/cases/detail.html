@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}{{ case.case_name }} - 판례 상세{% endblock %}
+
+{% block extra_head %}
+{% include "components/law_term_tooltip.html" %}
+<style>
+/* 목차 스타일 */
+.toc-sidebar {
+    position: sticky;
+    top: 100px;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+}
+
+.toc-item {
+    padding: 8px 12px;
+    border-left: 2px solid transparent;
+    color: #6b7280;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toc-item:hover {
+    color: #3b82f6;
+    border-left-color: #3b82f6;
+    background-color: #f3f4f6;
+}
+
+.toc-item.active {
+    color: #3b82f6;
+    border-left-color: #3b82f6;
+    font-weight: 500;
+}
+
+/* 참조 링크 스타일 */
+.reference-link {
+    color: #3b82f6;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.reference-link:hover {
+    color: #1d4ed8;
+}
+
+/* 요약 버튼 스타일 */
+.summary-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: #374151;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.summary-btn:hover {
+    background-color: #e5e7eb;
+}
+
+.summary-btn.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* 요약 패널 */
+.summary-panel {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.summary-panel-title {
+    font-weight: 600;
+    color: #1e40af;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.summary-panel-content {
+    color: #1e3a8a;
+    line-height: 1.6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex gap-8">
+    <!-- 메인 콘텐츠 -->
+    <div class="flex-1 max-w-4xl">
+        <!-- 뒤로가기 -->
+        <a href="/cases" class="inline-flex items-center text-gray-600 hover:text-blue-600 mb-6">
+            <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            목록으로
+        </a>
+        
+        <!-- 판례 헤더 -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="flex items-center space-x-2 mb-4">
+                <span class="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">
+                    {{ case.court_name or '법원' }}
+                </span>
+                <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">
+                    {{ case.case_type_name or '일반' }}
+                </span>
+                {% if case.judgment_type %}
+                <span class="px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800 rounded-full">
+                    {{ case.judgment_type }}
+                </span>
+                {% endif %}
+            </div>
+            
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ case.case_name }}</h1>
+            
+            <div class="flex items-center text-gray-600 text-sm space-x-4">
+                <span>사건번호: {{ case.case_number }}</span>
+                <span>선고일: {{ case.judgment_date }}</span>
+            </div>
+            
+            <!-- 요약 버튼 -->
+            <div class="mt-4" x-data="{ showSummary: false, summary: '', loading: false }">
+                <button 
+                    @click="if(!summary) { loading = true; fetch('/api/cases/{{ case.id }}/summary').then(r => r.json()).then(d => { summary = d.summary; loading = false; showSummary = true; }); } else { showSummary = !showSummary; }"
+                    class="summary-btn"
+                    :class="{ 'loading': loading }"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <span x-text="loading ? '요약 생성 중...' : (showSummary ? '요약 숨기기' : '본문 요약')"></span>
+                </button>
+                
+                <!-- 요약 패널 -->
+                <div x-show="showSummary && summary" x-transition class="summary-panel mt-4">
+                    <div class="summary-panel-title">
+                        <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        AI 요약
+                    </div>
+                    <div class="summary-panel-content" x-text="summary"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 판시사항 -->
+        {% if case.summary %}
+        <div id="section-summary" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">1</span>
+                판시사항
+            </h2>
+            <div class="prose max-w-none text-gray-700 law-term-content">
+                {{ case.summary | safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 판결요지 -->
+        {% if case.gist %}
+        <div id="section-gist" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">2</span>
+                판결요지
+            </h2>
+            <div class="prose max-w-none text-gray-700 law-term-content">
+                {{ case.gist | safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 참조조문 -->
+        {% if case.reference_provisions %}
+        <div id="section-provisions" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">3</span>
+                참조조문
+            </h2>
+            <div class="space-y-2">
+                {% for provision in case.reference_provisions.split(',') %}
+                <a href="/laws/search?q={{ provision | urlencode }}" class="reference-link block">
+                    {{ provision.strip() }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 참조판례 -->
+        {% if case.reference_cases %}
+        <div id="section-cases" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">4</span>
+                참조판례
+            </h2>
+            <div class="space-y-2">
+                {% for ref_case in case.reference_cases.split('\n') %}
+                {% if ref_case.strip() %}
+                <a href="/cases/search?q={{ ref_case | urlencode }}" class="reference-link block">
+                    {{ ref_case.strip() }}
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 판례 전문 -->
+        {% if case.full_text %}
+        <div id="section-full" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-gray-100 text-gray-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">5</span>
+                판례 전문
+            </h2>
+            <div class="prose max-w-none text-gray-700 law-term-content whitespace-pre-wrap">
+                {{ case.full_text | safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 연혁 -->
+        {% if case.history %}
+        <div id="section-history" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span class="w-6 h-6 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-sm font-bold mr-2">6</span>
+                판례 연혁
+            </h2>
+            <div class="space-y-3">
+                {% for history_item in case.history %}
+                <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                    <div class="text-sm text-gray-500">{{ history_item.date }}</div>
+                    <div class="flex-1">
+                        <a href="/cases/{{ history_item.id }}" class="text-blue-600 hover:text-blue-800">
+                            {{ history_item.description }}
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 목차 사이드바 -->
+    <div class="w-64 hidden lg:block">
+        <div class="toc-sidebar bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 mb-4">목차</h3>
+            <nav class="space-y-1">
+                {% if case.summary %}
+                <a href="#section-summary" class="toc-item block">1. 판시사항</a>
+                {% endif %}
+                {% if case.gist %}
+                <a href="#section-gist" class="toc-item block">2. 판결요지</a>
+                {% endif %}
+                {% if case.reference_provisions %}
+                <a href="#section-provisions" class="toc-item block">3. 참조조문</a>
+                {% endif %}
+                {% if case.reference_cases %}
+                <a href="#section-cases" class="toc-item block">4. 참조판례</a>
+                {% endif %}
+                {% if case.full_text %}
+                <a href="#section-full" class="toc-item block">5. 판례 전문</a>
+                {% endif %}
+                {% if case.history %}
+                <a href="#section-history" class="toc-item block">6. 판례 연혁</a>
+                {% endif %}
+            </nav>
+            
+            <!-- 법령 용어 버튼 -->
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <button 
+                    onclick="toggleLawTermSidebar()"
+                    class="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg"
+                >
+                    <svg class="w-4 h-4 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    법령 용어 해석
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 목차 활성화
+document.addEventListener('scroll', () => {
+    const sections = document.querySelectorAll('[id^="section-"]');
+    const tocItems = document.querySelectorAll('.toc-item');
+    
+    let currentSection = '';
+    
+    sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 150) {
+            currentSection = section.id;
+        }
+    });
+    
+    tocItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('href') === `#${currentSection}`) {
+            item.classList.add('active');
+        }
+    });
+});
+
+// 부드러운 스크롤
+document.querySelectorAll('.toc-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const targetId = item.getAttribute('href').slice(1);
+        const target = document.getElementById(targetId);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+</script>
+{% endblock %}

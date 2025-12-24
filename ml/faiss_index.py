@@ -33,7 +33,7 @@ class FAISSIndex:
         self._reverse_map: Dict[int, int] = {}  # doc_id -> faiss_idx
         
         # 인덱스 파일 경로
-        self.index_dir = Path(settings.faiss_index_dir)
+        self.index_dir = Path(settings.faiss_index_path)
         self.index_path = self.index_dir / f"{index_type}.index"
         self.map_path = self.index_dir / f"{index_type}.map.npy"
         

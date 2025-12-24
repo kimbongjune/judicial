@@ -2,14 +2,18 @@
 법률 판례 검색 시스템 - FastAPI 메인 애플리케이션
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from typing import Optional
+from datetime import date
+from fastapi import FastAPI, Request, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import init_db
+from app.database import init_db, get_session
+from app.services import CaseService, ConstitutionalService, InterpretationService, SimilaritySearchService
 
 
 @asynccontextmanager
@@ -76,38 +80,140 @@ async def index(request: Request):
 
 
 @app.get("/cases", response_class=HTMLResponse)
-async def cases_list(request: Request):
+async def cases_list(
+    request: Request,
+    q: Optional[str] = None,
+    court_name: Optional[str] = None,
+    case_type: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    session: AsyncSession = Depends(get_session)
+):
     """판례 목록 페이지"""
+    service = CaseService(session)
+    result = await service.search_cases(
+        q=q,
+        court_name=court_name,
+        case_type=case_type,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        page_size=20
+    )
+    
+    # 필터 옵션
+    courts = await service.get_distinct_courts()
+    case_types = await service.get_distinct_case_types()
+    
     return templates.TemplateResponse(
         "cases/list.html",
-        {"request": request, "cases": [], "q": None, "page": 1, "total_pages": 0, "total_count": 0}
+        {
+            "request": request,
+            "cases": result["items"],
+            "q": q,
+            "court_name": court_name,
+            "case_type": case_type,
+            "date_from": date_from,
+            "date_to": date_to,
+            "page": result["page"],
+            "total_pages": result["total_pages"],
+            "total_count": result["total_count"],
+            "courts": courts,
+            "case_types": case_types
+        }
     )
 
 
 @app.get("/constitutional", response_class=HTMLResponse)
-async def constitutional_list(request: Request):
+async def constitutional_list(
+    request: Request,
+    q: Optional[str] = None,
+    case_type: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    session: AsyncSession = Depends(get_session)
+):
     """헌재결정례 목록 페이지"""
+    service = ConstitutionalService(session)
+    result = await service.search_decisions(
+        q=q,
+        case_type=case_type,
+        page=page,
+        page_size=20
+    )
+    
     return templates.TemplateResponse(
         "constitutional/list.html",
-        {"request": request, "decisions": [], "q": None, "page": 1, "total_pages": 0, "total_count": 0}
+        {
+            "request": request,
+            "decisions": result["items"],
+            "q": q,
+            "case_type": case_type,
+            "page": result["page"],
+            "total_pages": result["total_pages"],
+            "total_count": result["total_count"]
+        }
     )
 
 
 @app.get("/interpretations", response_class=HTMLResponse)
-async def interpretations_list(request: Request):
+async def interpretations_list(
+    request: Request,
+    q: Optional[str] = None,
+    field: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    session: AsyncSession = Depends(get_session)
+):
     """법령해석례 목록 페이지"""
+    service = InterpretationService(session)
+    result = await service.search_interpretations(
+        q=q,
+        field=field,
+        page=page,
+        page_size=20
+    )
+    
     return templates.TemplateResponse(
         "interpretations/list.html",
-        {"request": request, "interpretations": [], "q": None, "page": 1, "total_pages": 0, "total_count": 0}
+        {
+            "request": request,
+            "interpretations": result["items"],
+            "q": q,
+            "field": field,
+            "page": result["page"],
+            "total_pages": result["total_pages"],
+            "total_count": result["total_count"]
+        }
     )
 
 
 @app.get("/similarity", response_class=HTMLResponse)
-async def similarity_search(request: Request):
+async def similarity_search(
+    request: Request,
+    q: Optional[str] = None,
+    session: AsyncSession = Depends(get_session)
+):
     """유사 문서 검색 페이지"""
+    similar_docs = []
+    
+    if q:
+        service = SimilaritySearchService(session)
+        results = await service.search_similar_cases(
+            query=q,
+            top_k=20,
+            threshold=0.3
+        )
+        similar_docs = results
+    
     return templates.TemplateResponse(
         "similarity/results.html",
-        {"request": request, "similar_docs": [], "source_doc": None, "doc_type": None}
+        {
+            "request": request,
+            "similar_docs": similar_docs,
+            "q": q,
+            "source_doc": None,
+            "doc_type": None
+        }
     )
 
 
@@ -115,12 +221,45 @@ async def similarity_search(request: Request):
 # API 라우터 등록
 # ===========================================
 
-# from app.api import cases, constitutional, interpretations, search, similarity
-# app.include_router(cases.router, prefix="/api/v1/cases", tags=["판례"])
-# app.include_router(constitutional.router, prefix="/api/v1/constitutional", tags=["헌재결정례"])
-# app.include_router(interpretations.router, prefix="/api/v1/interpretations", tags=["법령해석례"])
-# app.include_router(search.router, prefix="/api/v1/search", tags=["검색"])
-# app.include_router(similarity.router, prefix="/api/v1/similarity", tags=["유사검색"])
+from app.api import api_router
+app.include_router(api_router)
+
+
+# ===========================================
+# 판례 상세 페이지 라우트
+# ===========================================
+
+@app.get("/cases/{case_id}", response_class=HTMLResponse)
+async def case_detail(
+    request: Request,
+    case_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """판례 상세 페이지"""
+    service = CaseService(session)
+    case = await service.get_case_by_id(case_id)
+    
+    if not case:
+        return templates.TemplateResponse(
+            "cases/detail.html",
+            {"request": request, "case": None, "error": "판례를 찾을 수 없습니다"}
+        )
+    
+    # 목차 추출
+    toc = service.extract_toc_from_content(case.full_text)
+    
+    # 요약 생성
+    summary = service.summarize_case(case)
+    
+    return templates.TemplateResponse(
+        "cases/detail.html",
+        {
+            "request": request,
+            "case": case,
+            "toc": toc,
+            "summary": summary
+        }
+    )
 
 
 if __name__ == "__main__":
