@@ -14,6 +14,7 @@ from app.database import engine, Base, init_db, drop_db
 from app.models.case import Case
 from app.models.constitutional import ConstitutionalDecision
 from app.models.interpretation import Interpretation
+from app.models.bookmark import Bookmark
 
 
 async def main():

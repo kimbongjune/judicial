@@ -6,6 +6,8 @@ from app.api.law_terms import router as law_terms_router
 from app.api.cases import router as cases_router
 from app.api.laws import router as laws_router
 from app.api.similarity import router as similarity_router
+from app.api.bookmarks import router as bookmarks_router
+from app.api.stats import router as stats_router
 
 api_router = APIRouter()
 
@@ -14,5 +16,8 @@ api_router.include_router(law_terms_router)
 api_router.include_router(cases_router)
 api_router.include_router(laws_router)
 api_router.include_router(similarity_router)
+api_router.include_router(bookmarks_router)
+api_router.include_router(stats_router)
 
 __all__ = ["api_router"]
+

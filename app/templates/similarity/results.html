@@ -1,125 +1,192 @@
 {% extends "base.html" %}
 
-{% block title %}유사 문서 검색{% endblock %}
+{% block title %}유사 문서 검색 - JudicialSearch{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">유사 문서 검색</h1>
-    <p class="text-gray-600">AI 기반 의미적 유사도 분석으로 관련 문서를 찾습니다.</p>
-</div>
-
-{% if source_doc %}
-<!-- 원본 문서 정보 -->
-<div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-6 mb-8">
-    <h2 class="text-lg font-semibold text-gray-900 mb-2">원본 문서</h2>
-    <div class="flex items-center space-x-2 mb-3">
-        <span class="inline-block px-2 py-1 text-xs font-medium 
-            {% if doc_type == 'case' %}bg-blue-100 text-blue-800
-            {% elif doc_type == 'constitutional' %}bg-purple-100 text-purple-800
-            {% else %}bg-green-100 text-green-800{% endif %} rounded">
-            {% if doc_type == 'case' %}판례
-            {% elif doc_type == 'constitutional' %}헌재결정례
-            {% else %}법령해석례{% endif %}
-        </span>
+<div class="max-w-5xl mx-auto">
+    <div class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">유사 문서 검색</h1>
+        <p class="text-slate-500 dark:text-slate-400">AI 기반 의미적 유사도 분석으로 관련 문서를 찾습니다.</p>
     </div>
-    <h3 class="text-xl font-bold text-gray-900 mb-2">{{ source_doc.title }}</h3>
-    <p class="text-gray-600 text-sm">{{ source_doc.number }}</p>
-</div>
 
-<!-- 유사 문서 목록 -->
-{% if similar_docs %}
-<div class="mb-4">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">유사 문서 ({{ similar_docs|length }}건)</h2>
-</div>
+    {% if original_doc %}
+    <!-- 원본 문서 정보 -->
+    <div
+        class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 mb-12 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-blue-500"></div>
 
-<div class="space-y-4">
-    {% for doc in similar_docs %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-        <!-- 유사도 표시 -->
-        <div class="absolute top-4 right-4">
-            <div class="flex items-center space-x-2">
-                <span class="text-sm text-gray-500">유사도</span>
-                <span class="inline-block px-3 py-1 text-sm font-bold 
-                    {% if doc.similarity >= 0.8 %}bg-green-100 text-green-800
-                    {% elif doc.similarity >= 0.6 %}bg-yellow-100 text-yellow-800
-                    {% else %}bg-gray-100 text-gray-800{% endif %} rounded-full">
-                    {{ (doc.similarity * 100)|round(1) }}%
-                </span>
-            </div>
+        <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center">
+            <span
+                class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center mr-3 text-slate-500">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </span>
+            원본 문서
+        </h2>
+
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <span
+                class="px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded-lg">
+                {% if doc_type == 'case' %}판례
+                {% elif doc_type == 'constitutional' %}헌재결정례
+                {% else %}법령해석례{% endif %}
+            </span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">
+                {% if doc_type == 'case' %}{{ original_doc.case_number }}
+                {% elif doc_type == 'constitutional' %}{{ original_doc.사건번호 }}
+                {% else %}{{ original_doc.안건번호 }}{% endif %}
+            </span>
         </div>
-        
-        <div class="pr-24">
-            <div class="flex items-center space-x-2 mb-2">
-                <span class="inline-block px-2 py-1 text-xs font-medium 
-                    {% if doc.type == 'case' %}bg-blue-100 text-blue-800
-                    {% elif doc.type == 'constitutional' %}bg-purple-100 text-purple-800
-                    {% else %}bg-green-100 text-green-800{% endif %} rounded">
-                    {% if doc.type == 'case' %}판례
-                    {% elif doc.type == 'constitutional' %}헌재결정례
-                    {% else %}법령해석례{% endif %}
-                </span>
-            </div>
-            
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                <a href="/{{ doc.type }}s/{{ doc.id }}" class="hover:text-blue-600">
-                    {{ doc.title }}
-                </a>
-            </h3>
-            
-            <p class="text-sm text-gray-600 mb-3">{{ doc.number }}</p>
-            
-            {% if doc.summary %}
-            <p class="text-gray-700 text-sm line-clamp-2">
-                {{ doc.summary[:200] }}{% if doc.summary|length > 200 %}...{% endif %}
-            </p>
+
+        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+            {% if doc_type == 'case' %}{{ original_doc.case_name }}
+            {% elif doc_type == 'constitutional' %}{{ original_doc.사건명 }}
+            {% else %}{{ original_doc.안건명 }}{% endif %}
+        </h3>
+
+        <div
+            class="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm line-clamp-3 leading-relaxed">
+            {% if doc_type == 'case' %}{{ original_doc.summary or original_doc.gist or '요약 정보 없음' }}
+            {% elif doc_type == 'constitutional' %}{{ original_doc.결정요지 or '요약 정보 없음' }}
+            {% else %}{{ original_doc.질의요지 or '요약 정보 없음' }}
             {% endif %}
         </div>
-        
-        <!-- 유사도 프로그레스 바 -->
-        <div class="mt-4 h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div class="h-full 
-                {% if doc.similarity >= 0.8 %}bg-green-500
-                {% elif doc.similarity >= 0.6 %}bg-yellow-500
-                {% else %}bg-gray-400{% endif %}"
-                style="width: {{ (doc.similarity * 100)|round }}%">
+    </div>
+
+    <!-- 유사 문서 목록 -->
+    <div class="space-y-6">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                <svg class="w-6 h-6 mr-2 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                유사 문서 ({{ similar_docs|length }}건)
+            </h2>
+        </div>
+
+        {% if similar_docs %}
+        <div class="grid grid-cols-1 gap-6">
+            {% for doc in similar_docs %}
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-violet-300 dark:hover:border-violet-700 transition-all duration-200 group relative overflow-hidden">
+                <!-- 유사도 표시 -->
+                <div class="absolute top-0 right-0 p-6">
+                    <div class="flex flex-col items-end">
+                        <span class="text-sm text-slate-500 dark:text-slate-400 mb-1">유사도</span>
+                        <span class="text-2xl font-bold text-violet-600 dark:text-violet-400">{{ (doc.similarity_score *
+                            100) | round(1) }}%</span>
+                    </div>
+                </div>
+
+                <div class="pr-24">
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <span
+                            class="px-2.5 py-1 text-xs font-semibold 
+                            {% if doc.type == 'case' %}bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300
+                            {% elif doc.type == 'constitutional' %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300
+                            {% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300{% endif %} rounded-lg">
+                            {% if doc.type == 'case' %}판례
+                            {% elif doc.type == 'constitutional' %}헌재결정례
+                            {% else %}법령해석례{% endif %}
+                        </span>
+                        <span class="text-xs text-slate-400">
+                            {% if doc.type == 'case' %}{{ doc.court_name }}
+                            {% elif doc.type == 'constitutional' %}{{ doc.사건종류명 }}
+                            {% else %}{{ doc.분야 }}{% endif %}
+                        </span>
+                    </div>
+
+                    <h3
+                        class="text-xl font-bold text-slate-900 dark:text-white mb-2 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                        <a
+                            href="/{% if doc.type == 'case' %}cases{% elif doc.type == 'constitutional' %}constitutional{% else %}interpretations{% endif %}/{{ doc.id }}">
+                            {% if doc.type == 'case' %}{{ doc.case_name }}
+                            {% elif doc.type == 'constitutional' %}{{ doc.사건명 }}
+                            {% else %}{{ doc.안건명 }}{% endif %}
+                        </a>
+                    </h3>
+
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        {% if doc.type == 'case' %}사건번호: {{ doc.case_number }}
+                        {% elif doc.type == 'constitutional' %}사건번호: {{ doc.사건번호 }}
+                        {% else %}안건번호: {{ doc.안건번호 }}{% endif %}
+                    </p>
+
+                    <!-- 유사도 프로그레스 바 -->
+                    <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mb-4">
+                        <div class="bg-gradient-to-r from-violet-500 to-indigo-500 h-1.5 rounded-full"
+                            style="width: {{ doc.similarity_score * 100 }}%"></div>
+                    </div>
+
+                    <div class="text-sm text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                        {% if doc.type == 'case' %}{{ doc.summary or doc.gist or '요약 정보 없음' }}
+                        {% elif doc.type == 'constitutional' %}{{ doc.결정요지 or '요약 정보 없음' }}
+                        {% else %}{{ doc.질의요지 or '요약 정보 없음' }}
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="/{% if doc.type == 'case' %}cases{% elif doc.type == 'constitutional' %}constitutional{% else %}interpretations{% endif %}/{{ doc.id }}"
+                            class="inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 transition-colors">
+                            상세보기 <svg class="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </a>
+                    </div>
+                </div>
             </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div
+            class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-16 text-center">
+            <div
+                class="w-20 h-20 bg-slate-50 dark:bg-slate-700/50 rounded-full mx-auto mb-6 flex items-center justify-center text-slate-300">
+                <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">유사 문서를 찾을 수 없습니다</h3>
+            <p class="text-slate-500 dark:text-slate-400">데이터가 충분히 수집되지 않았거나 유사한 문서가 없습니다.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- 문서 선택 안내 -->
+    <div
+        class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-16 text-center max-w-2xl mx-auto">
+        <div
+            class="w-20 h-20 bg-violet-50 dark:bg-violet-900/20 rounded-full mx-auto mb-6 flex items-center justify-center text-violet-500">
+            <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </div>
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">유사 문서 검색</h3>
+        <p class="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+            판례, 헌재결정례, 법령해석례 상세 페이지에서<br>
+            "유사문서 찾기" 버튼을 클릭하여 유사한 문서를 검색할 수 있습니다.
+        </p>
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
+            <a href="/cases"
+                class="px-6 py-3 bg-white border border-slate-200 text-slate-700 hover:border-violet-500 hover:text-violet-600 rounded-xl transition-colors font-medium dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-violet-400">
+                판례 검색
+            </a>
+            <a href="/constitutional"
+                class="px-6 py-3 bg-white border border-slate-200 text-slate-700 hover:border-violet-500 hover:text-violet-600 rounded-xl transition-colors font-medium dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-violet-400">
+                헌재결정례 검색
+            </a>
+            <a href="/interpretations"
+                class="px-6 py-3 bg-white border border-slate-200 text-slate-700 hover:border-violet-500 hover:text-violet-600 rounded-xl transition-colors font-medium dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-violet-400">
+                법령해석례 검색
+            </a>
         </div>
     </div>
-    {% endfor %}
+    {% endif %}
 </div>
-
-{% else %}
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-    <svg class="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    <h3 class="text-lg font-medium text-gray-900 mb-2">유사 문서를 찾을 수 없습니다</h3>
-    <p class="text-gray-600">데이터가 충분히 수집되지 않았거나 유사한 문서가 없습니다.</p>
-</div>
-{% endif %}
-
-{% else %}
-<!-- 문서 선택 안내 -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-    <svg class="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-    <h3 class="text-lg font-medium text-gray-900 mb-2">유사 문서 검색</h3>
-    <p class="text-gray-600 mb-6">
-        판례, 헌재결정례, 법령해석례 상세 페이지에서<br>
-        "유사문서 찾기" 버튼을 클릭하여 유사한 문서를 검색할 수 있습니다.
-    </p>
-    <div class="flex justify-center space-x-4">
-        <a href="/cases" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            판례 검색
-        </a>
-        <a href="/constitutional" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-            헌재결정례 검색
-        </a>
-        <a href="/interpretations" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-            법령해석례 검색
-        </a>
-    </div>
-</div>
-{% endif %}
 {% endblock %}

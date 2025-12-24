@@ -1,123 +1,232 @@
 {% extends "base.html" %}
 
-{% block title %}법률 판례 검색 - 홈{% endblock %}
-
 {% block content %}
-<div class="text-center py-12">
-    <!-- 히어로 섹션 -->
-    <div class="mb-12">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">
-            법률 판례 통합 검색
-        </h1>
-        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
-            대한민국 판례, 헌법재판소 결정례, 법령해석례를 <br>
-            한 곳에서 검색하고 유사 문서를 찾아보세요.
-        </p>
-    </div>
-    
-    <!-- 통합 검색 박스 -->
-    <div class="max-w-2xl mx-auto mb-16">
-        <form action="/cases" method="GET" class="relative">
-            <input 
-                type="text" 
-                name="q" 
-                placeholder="검색어를 입력하세요 (예: 손해배상, 계약 해제, 근로계약)"
-                class="w-full px-6 py-4 pr-16 text-lg border-2 border-gray-200 rounded-full focus:outline-none focus:border-blue-500 shadow-sm"
-            >
-            <button 
-                type="submit"
-                class="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition-colors"
-            >
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </button>
-        </form>
-    </div>
-    
-    <!-- 카테고리 카드 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-        <!-- 판례 카드 -->
-        <a href="/cases" class="block bg-white rounded-2xl shadow-sm border border-gray-200 p-8 card-hover transition-all duration-200">
-            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900 mb-3">판례</h2>
-            <p class="text-gray-600">
-                대법원, 고등법원, 지방법원의 민사·형사·행정 판례를 검색합니다.
+<div class="space-y-16">
+    <!-- Hero Section -->
+    <div class="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-2xl">
+        <div class="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-indigo-600/20"></div>
+        <div class="absolute -top-24 -right-24 w-96 h-96 bg-violet-500/30 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl"></div>
+
+        <div class="relative px-8 py-20 text-center z-10">
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-6">
+                법률 검색의 새로운 기준,<br>
+                <span
+                    class="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400">JudicialSearch</span>
+            </h1>
+            <p class="text-lg text-slate-300 mb-10 max-w-2xl mx-auto font-light">
+                판례, 헌재결정례, 법령해석례를 한 곳에서.<br>
+                AI 기반 유사 판례 검색으로 더 정확하고 스마트하게 찾아보세요.
             </p>
-        </a>
-        
-        <!-- 헌재결정례 카드 -->
-        <a href="/constitutional" class="block bg-white rounded-2xl shadow-sm border border-gray-200 p-8 card-hover transition-all duration-200">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg class="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900 mb-3">헌재결정례</h2>
-            <p class="text-gray-600">
-                헌법재판소의 헌마, 헌바, 헌가 등 헌법 재판 결정례를 검색합니다.
-            </p>
-        </a>
-        
-        <!-- 법령해석례 카드 -->
-        <a href="/interpretations" class="block bg-white rounded-2xl shadow-sm border border-gray-200 p-8 card-hover transition-all duration-200">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900 mb-3">법령해석례</h2>
-            <p class="text-gray-600">
-                법제처의 법령 해석에 관한 질의회신 사례를 검색합니다.
-            </p>
-        </a>
-    </div>
-    
-    <!-- 기능 소개 -->
-    <div class="mt-20 pt-12 border-t border-gray-200">
-        <h2 class="text-2xl font-bold text-gray-900 mb-8">주요 기능</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+
+            <!-- Search Bar -->
+            <div class="max-w-3xl mx-auto">
+                <form action="/cases" method="GET" class="relative group">
+                    <div
+                        class="absolute inset-0 bg-violet-500 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-200">
+                    </div>
+                    <div class="relative flex items-center bg-white rounded-2xl shadow-lg overflow-hidden p-2">
+                        <div class="pl-4 text-slate-400">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input type="text" name="q"
+                            class="w-full px-4 py-3 text-lg text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
+                            placeholder="검색어를 입력하세요 (예: 손해배상, 계약 해지)">
+                        <button type="submit"
+                            class="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-xl transition-colors shadow-md">
+                            검색
+                        </button>
+                    </div>
+                </form>
+                <div class="mt-4 flex items-center justify-center space-x-2 text-sm text-slate-400">
+                    <svg class="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
+                    <span>자연어로 검색하면 AI가 유사한 판례를 찾아드립니다</span>
                 </div>
-                <h3 class="font-semibold text-gray-900 mb-2">키워드 검색</h3>
-                <p class="text-sm text-gray-600">판례명, 사건번호, 본문 내용 검색</p>
-            </div>
-            <div class="text-center">
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">필터링</h3>
-                <p class="text-sm text-gray-600">법원, 사건종류, 기간별 필터</p>
-            </div>
-            <div class="text-center">
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">유사 문서</h3>
-                <p class="text-sm text-gray-600">AI 기반 유사 판례 추천</p>
-            </div>
-            <div class="text-center">
-                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <svg class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-                <h3 class="font-semibold text-gray-900 mb-2">상세 보기</h3>
-                <p class="text-sm text-gray-600">판결문, 결정문 전문 조회</p>
             </div>
         </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- 판례 -->
+        <a href="/cases"
+            class="group relative bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 dark:border-slate-700 overflow-hidden">
+            <div
+                class="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110">
+            </div>
+            <div class="relative">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-200">판례</h3>
+                    <div
+                        class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <span class="font-bold">1</span>
+                    </div>
+                </div>
+                <p class="text-3xl font-bold text-slate-900 dark:text-white mb-1">{{ case_count | default('0') }}</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 group-hover:text-blue-600 transition-colors">전체 데이터
+                    검색하기 &rarr;</p>
+            </div>
+        </a>
+
+        <!-- 헌재결정례 -->
+        <a href="/constitutional"
+            class="group relative bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 dark:border-slate-700 overflow-hidden">
+            <div
+                class="absolute top-0 right-0 w-32 h-32 bg-violet-50 dark:bg-violet-900/20 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110">
+            </div>
+            <div class="relative">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-200">헌재결정례</h3>
+                    <div
+                        class="w-10 h-10 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center text-violet-600 dark:text-violet-400">
+                        <span class="font-bold">2</span>
+                    </div>
+                </div>
+                <p class="text-3xl font-bold text-slate-900 dark:text-white mb-1">{{ constitutional_count | default('0')
+                    }}</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 group-hover:text-violet-600 transition-colors">전체
+                    데이터 검색하기 &rarr;</p>
+            </div>
+        </a>
+
+        <!-- 법령해석례 -->
+        <a href="/interpretations"
+            class="group relative bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 dark:border-slate-700 overflow-hidden">
+            <div
+                class="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-900/20 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110">
+            </div>
+            <div class="relative">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-200">법령해석례</h3>
+                    <div
+                        class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <span class="font-bold">3</span>
+                    </div>
+                </div>
+                <p class="text-3xl font-bold text-slate-900 dark:text-white mb-1">{{ interpretation_count | default('0')
+                    }}</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 transition-colors">전체
+                    데이터 검색하기 &rarr;</p>
+            </div>
+        </a>
+    </div>
+
+    <!-- Features Section -->
+    <div>
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-8 text-center">주요 기능</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-all duration-300">
+                <div
+                    class="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl mx-auto mb-6 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-900 dark:text-white mb-3">통합 검색</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">판례, 헌재결정례, 해석례를<br>한 번에 검색하세요</p>
+            </div>
+
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-all duration-300">
+                <div
+                    class="w-14 h-14 bg-violet-50 dark:bg-violet-900/20 rounded-2xl mx-auto mb-6 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-900 dark:text-white mb-3">AI 유사검색</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">문맥을 이해하는 AI가<br>유사한 판례를 찾아줍니다</p>
+            </div>
+
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-all duration-300">
+                <div
+                    class="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl mx-auto mb-6 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-900 dark:text-white mb-3">법령용어 해석</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">어려운 법률 용어를<br>쉽게 설명해드립니다</p>
+            </div>
+
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl p-8 text-center shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-all duration-300">
+                <div
+                    class="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-2xl mx-auto mb-6 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-900 dark:text-white mb-3">북마크</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">중요한 판례를 저장하고<br>언제든 다시 확인하세요</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Cases Section -->
+    <div>
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">최근 등록된 판례</h2>
+            <a href="/cases"
+                class="text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 flex items-center">
+                더보기 <svg class="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+        </div>
+
+        {% if recent_cases %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for case in recent_cases %}
+            <a href="/cases/{{ case.id }}"
+                class="group bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-800 transition-all duration-200">
+                <div class="flex items-start justify-between mb-3">
+                    <span
+                        class="px-2.5 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-lg group-hover:bg-violet-50 group-hover:text-violet-600 dark:group-hover:bg-violet-900/30 dark:group-hover:text-violet-300 transition-colors">
+                        {{ case.court_name }}
+                    </span>
+                    <span class="text-xs text-slate-400">{{ case.judgment_date }}</span>
+                </div>
+                <h3
+                    class="text-lg font-bold text-slate-900 dark:text-white mb-2 line-clamp-1 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                    {{ case.case_name }}
+                </h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">
+                    {{ case.summary or '요약 정보가 없습니다.' }}
+                </p>
+                <div class="flex items-center text-xs text-slate-400">
+                    <span class="mr-3">사건번호: {{ case.case_number }}</span>
+                    <span>{{ case.case_type_name }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div
+            class="bg-white dark:bg-slate-800 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-700 border-dashed">
+            <div
+                class="w-16 h-16 bg-slate-50 dark:bg-slate-700/50 rounded-full mx-auto mb-4 flex items-center justify-center text-slate-400">
+                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <p class="text-slate-500 dark:text-slate-400 font-medium">등록된 판례가 없습니다.</p>
+            <p class="text-sm text-slate-400 dark:text-slate-500 mt-2">ETL을 실행하여 데이터를 수집해 주세요.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

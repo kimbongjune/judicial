@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}{{ interpretation.안건명 if interpretation else '법령해석례 상세' }} - JudicialSearch{% endblock %}
+
+{% block content %}
+{% if interpretation %}
+<div class="max-w-5xl mx-auto">
+    <!-- 뒤로가기 -->
+    <a href="/interpretations"
+        class="inline-flex items-center text-sm text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-400 mb-8 transition-colors group">
+        <svg class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        목록으로 돌아가기
+    </a>
+
+    <!-- 헤더 -->
+    <div
+        class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 mb-8 relative overflow-hidden">
+        <div
+            class="absolute top-0 right-0 w-64 h-64 bg-emerald-50 dark:bg-emerald-900/10 rounded-bl-full -mr-16 -mt-16 pointer-events-none">
+        </div>
+
+        <div class="relative z-10">
+            <div class="flex justify-between items-start mb-6">
+                <div class="flex items-center flex-wrap gap-2">
+                    {% if interpretation.분야 %}
+                    <span
+                        class="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-lg">
+                        {{ interpretation.분야 }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- 북마크 및 액션 버튼 -->
+                <div class="flex items-center space-x-2" x-data="{ 
+                    isBookmarked: false,
+                    sessionId: '',
+                    init() {
+                        this.sessionId = localStorage.getItem('session_id') || crypto.randomUUID();
+                        localStorage.setItem('session_id', this.sessionId);
+                        this.checkBookmark();
+                    },
+                    async checkBookmark() {
+                        try {
+                            const res = await fetch(`/api/bookmarks/check?session_id=${this.sessionId}&entity_type=interpretation&entity_id={{ interpretation.법령해석례일련번호 }}`);
+                            const data = await res.json();
+                            this.isBookmarked = data.bookmarked;
+                        } catch(e) { console.error(e); }
+                    },
+                    async toggleBookmark() {
+                        if (this.isBookmarked) {
+                            await fetch(`/api/bookmarks?session_id=${this.sessionId}&entity_type=interpretation&entity_id={{ interpretation.법령해석례일련번호 }}`, { method: 'DELETE' });
+                            this.isBookmarked = false;
+                        } else {
+                            await fetch('/api/bookmarks', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    session_id: this.sessionId,
+                                    entity_type: 'interpretation',
+                                    entity_id: {{ interpretation.법령해석례일련번호 }},
+                                    entity_title: '{{ interpretation.안건명 | replace("'", "\\'") }}',
+                                    entity_number: '{{ interpretation.안건번호 }}'
+                                })
+                            });
+                            this.isBookmarked = true;
+                        }
+                    }
+                }">
+                    <button @click="toggleBookmark()"
+                        class="p-2.5 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+                        :class="isBookmarked ? 'bg-amber-50 border-amber-200 text-amber-500 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-400 hover:text-amber-500 hover:border-amber-200 dark:bg-slate-800 dark:border-slate-600 dark:hover:border-slate-500'">
+                        <svg class="w-5 h-5" :fill="isBookmarked ? 'currentColor' : 'none'" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                    </button>
+
+                    <button onclick="window.print()"
+                        class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:hover:text-slate-300 transition-all duration-200">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-4 leading-tight">{{ interpretation.안건명 }}
+            </h1>
+
+            <div
+                class="flex items-center text-sm text-slate-500 dark:text-slate-400 space-x-6 border-t border-slate-100 dark:border-slate-700/50 pt-6 mt-6">
+                <div class="flex items-center">
+                    <span class="font-medium text-slate-700 dark:text-slate-300 mr-2">안건번호</span>
+                    {{ interpretation.안건번호 }}
+                </div>
+                <div class="flex items-center">
+                    <span class="font-medium text-slate-700 dark:text-slate-300 mr-2">회신일자</span>
+                    {{ interpretation.회신일자 }}
+                </div>
+                <div class="ml-auto">
+                    <a href="/similarity?doc_type=interpretation&doc_id={{ interpretation.법령해석례일련번호 }}"
+                        class="inline-flex items-center text-violet-600 hover:text-violet-700 font-medium transition-colors">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        유사해석례 분석
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 탭 네비게이션 -->
+    <div x-data="{ activeTab: 'question' }"
+        class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[600px]">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-2">
+            <nav class="flex overflow-x-auto" aria-label="Tabs">
+                <button @click="activeTab = 'question'"
+                    :class="activeTab === 'question' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
+                    질의요지
+                </button>
+                <button @click="activeTab = 'answer'"
+                    :class="activeTab === 'answer' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
+                    회답
+                </button>
+                <button @click="activeTab = 'reasoning'"
+                    :class="activeTab === 'reasoning' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
+                    이유
+                </button>
+                <button @click="activeTab = 'provisions'"
+                    :class="activeTab === 'provisions' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
+                    참조조문
+                </button>
+            </nav>
+        </div>
+
+        <!-- 탭 콘텐츠 -->
+        <div class="p-8">
+            <!-- 질의요지 탭 -->
+            <div x-show="activeTab === 'question'" class="animate-fade-in">
+                {% if interpretation.질의요지 %}
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center">
+                        <span class="w-1 h-6 bg-emerald-500 rounded-full mr-3"></span>
+                        질의요지
+                    </h3>
+                    <div
+                        class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-700">
+                        {{ interpretation.질의요지 | safe }}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                    질의요지 정보가 없습니다.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 회답 탭 -->
+            <div x-show="activeTab === 'answer'" x-cloak class="animate-fade-in">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">회답</h3>
+                {% if interpretation.회답 %}
+                <div
+                    class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose whitespace-pre-wrap font-serif">
+                    {{ interpretation.회답 | safe }}
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                    회답 정보가 없습니다.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 이유 탭 -->
+            <div x-show="activeTab === 'reasoning'" x-cloak class="animate-fade-in">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">이유</h3>
+                {% if interpretation.이유 %}
+                <div
+                    class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose whitespace-pre-wrap font-serif">
+                    {{ interpretation.이유 | safe }}
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                    이유 정보가 없습니다.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 참조조문 탭 -->
+            <div x-show="activeTab === 'provisions'" x-cloak class="animate-fade-in">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">참조조문</h3>
+                {% if interpretation.참조조문 %}
+                <div class="grid grid-cols-1 gap-3">
+                    {% for provision in interpretation.참조조문.split('\n') %}
+                    {% if provision.strip() %}
+                    <div
+                        class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                        {{ provision.strip() }}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                    참조조문 정보가 없습니다.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- 에러 페이지 -->
+<div
+    class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-16 text-center max-w-2xl mx-auto mt-12">
+    <div
+        class="w-20 h-20 bg-slate-50 dark:bg-slate-700/50 rounded-full mx-auto mb-6 flex items-center justify-center text-slate-300">
+        <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+    </div>
+    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ error or '해석례를 찾을 수 없습니다' }}</h3>
+    <p class="text-slate-500 dark:text-slate-400 mb-8">요청하신 해석례가 존재하지 않거나 삭제되었을 수 있습니다.</p>
+    <a href="/interpretations"
+        class="inline-flex items-center px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-xl transition-colors shadow-sm">
+        목록으로 돌아가기
+    </a>
+</div>
+{% endif %}
+{% endblock %}

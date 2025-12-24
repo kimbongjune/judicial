@@ -2,7 +2,7 @@
 법제처 OpenAPI 클라이언트
 판례, 헌재결정례, 법령해석례, 법령, 법령용어 API 호출
 HTML Fallback 크롤링 지원
-Selenium을 통한 JS 렌더링 페이지 파싱 지원
+Selenium을 통한 JS 렌더링 페이지 파싱 지원 (병렬 처리 지원)
 """
 import asyncio
 import json
@@ -12,6 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 from typing import Optional, Dict, List, Any
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 import aiohttp
 from bs4 import BeautifulSoup
 
@@ -26,6 +27,25 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from app.config import settings
+
+# Selenium용 ThreadPoolExecutor (여러 Chrome 인스턴스 병렬 실행)
+_selenium_executor: Optional[ThreadPoolExecutor] = None
+
+
+def get_selenium_executor(max_workers: int = 5) -> ThreadPoolExecutor:
+    """Selenium용 전역 ThreadPoolExecutor 반환"""
+    global _selenium_executor
+    if _selenium_executor is None or _selenium_executor._shutdown:
+        _selenium_executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="selenium")
+    return _selenium_executor
+
+
+def shutdown_selenium_executor():
+    """Selenium Executor 종료"""
+    global _selenium_executor
+    if _selenium_executor is not None:
+        _selenium_executor.shutdown(wait=True)
+        _selenium_executor = None
 
 
 class LawAPIClient:
@@ -518,11 +538,12 @@ class LawAPIClient:
             print(f"HTML 요청 실패: {e}")
             raise
     
-    async def _fetch_with_selenium(self, url: str, case_serial_number: int) -> Dict[str, Any]:
+    def _selenium_fetch_sync(self, url: str, case_serial_number: int) -> Dict[str, Any]:
         """
-        Selenium headless Chrome으로 JS 렌더링 후 파싱
+        Selenium 동기 크롤링 (ThreadPoolExecutor에서 실행됨)
         
-        외부 시스템(국세법령정보시스템 등)으로 리다이렉트되는 경우 사용
+        이 메서드는 동기 함수이며, _fetch_with_selenium()에서
+        run_in_executor를 통해 비동기로 호출됩니다.
         """
         result = {
             "판례정보일련번호": str(case_serial_number),
@@ -549,7 +570,7 @@ class LawAPIClient:
             options.add_argument("--window-size=1920,1080")
             options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             
-            # WebDriver 초기화 (webdriver-manager가 자동으로 chromedriver 설치)
+            # WebDriver 초기화
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
             driver.set_page_load_timeout(30)
@@ -557,8 +578,8 @@ class LawAPIClient:
             # 페이지 로드
             driver.get(url)
             
-            # JS 렌더링 대기 (최대 10초)
-            time.sleep(3)  # 기본 대기
+            # JS 렌더링 대기
+            time.sleep(3)
             
             # 동적 콘텐츠 대기 시도
             try:
@@ -566,7 +587,7 @@ class LawAPIClient:
                     lambda d: d.find_element(By.TAG_NAME, "body").text.strip() != ""
                 )
             except TimeoutException:
-                pass  # 타임아웃 무시, 이미 로드된 내용으로 진행
+                pass
             
             # 렌더링된 HTML 가져오기
             html = driver.page_source
@@ -582,7 +603,7 @@ class LawAPIClient:
                 if value:
                     result[key] = value
             
-            # 여전히 콘텐츠 없으면 에러 표시
+            # 콘텐츠 검증
             has_content = bool(
                 result.get("사건번호") or 
                 result.get("판결요지") or 
@@ -606,6 +627,24 @@ class LawAPIClient:
         finally:
             if driver:
                 driver.quit()
+    
+    async def _fetch_with_selenium(self, url: str, case_serial_number: int) -> Dict[str, Any]:
+        """
+        Selenium headless Chrome으로 JS 렌더링 후 파싱 (비동기 래퍼)
+        
+        동기 Selenium 코드를 ThreadPoolExecutor에서 실행하여
+        여러 크롤링 작업을 병렬로 처리할 수 있습니다.
+        """
+        loop = asyncio.get_event_loop()
+        executor = get_selenium_executor()
+        
+        # 동기 함수를 ThreadPool에서 실행
+        return await loop.run_in_executor(
+            executor,
+            self._selenium_fetch_sync,
+            url,
+            case_serial_number
+        )
     
     def _parse_external_page(self, html: str, case_serial_number: int) -> Dict[str, Any]:
         """

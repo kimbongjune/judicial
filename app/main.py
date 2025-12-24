@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     # 시작 시 실행
     print("🚀 애플리케이션 시작...")
     await init_db()
-    print("✅ 데이터베이스 초기화 완료")
+    print("데이터베이스 초기화 완료")
     
     yield
     
@@ -71,11 +71,36 @@ async def health_check():
 # ===========================================
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(request: Request, session: AsyncSession = Depends(get_session)):
     """메인 페이지"""
+    from sqlalchemy import select, func
+    from app.models import Case, ConstitutionalDecision, Interpretation
+    
+    # 통계 조회
+    case_count_result = await session.execute(select(func.count()).select_from(Case))
+    case_count = case_count_result.scalar() or 0
+    
+    constitutional_count_result = await session.execute(select(func.count()).select_from(ConstitutionalDecision))
+    constitutional_count = constitutional_count_result.scalar() or 0
+    
+    interpretation_count_result = await session.execute(select(func.count()).select_from(Interpretation))
+    interpretation_count = interpretation_count_result.scalar() or 0
+    
+    # 최근 판례 조회
+    recent_cases_result = await session.execute(
+        select(Case).order_by(Case.judgment_date.desc()).limit(4)
+    )
+    recent_cases = recent_cases_result.scalars().all()
+    
     return templates.TemplateResponse(
         "index.html",
-        {"request": request}
+        {
+            "request": request,
+            "case_count": f"{case_count:,}",
+            "constitutional_count": f"{constitutional_count:,}",
+            "interpretation_count": f"{interpretation_count:,}",
+            "recent_cases": recent_cases
+        }
     )
 
 
@@ -83,8 +108,8 @@ async def index(request: Request):
 async def cases_list(
     request: Request,
     q: Optional[str] = None,
-    court_name: Optional[str] = None,
-    case_type: Optional[str] = None,
+    court: Optional[str] = Query(None),
+    case_type: Optional[str] = Query(None),
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     page: int = Query(1, ge=1),
@@ -94,7 +119,7 @@ async def cases_list(
     service = CaseService(session)
     result = await service.search_cases(
         q=q,
-        court_name=court_name,
+        court_name=court,
         case_type=case_type,
         date_from=date_from,
         date_to=date_to,
@@ -111,9 +136,9 @@ async def cases_list(
         {
             "request": request,
             "cases": result["items"],
-            "q": q,
-            "court_name": court_name,
-            "case_type": case_type,
+            "query": q or "",
+            "selected_courts": [court] if court else [],
+            "selected_case_types": [case_type] if case_type else [],
             "date_from": date_from,
             "date_to": date_to,
             "page": result["page"],
@@ -217,6 +242,60 @@ async def similarity_search(
     )
 
 
+@app.get("/stats", response_class=HTMLResponse)
+async def stats_page(request: Request, session: AsyncSession = Depends(get_session)):
+    """통계 대시보드 페이지"""
+    from sqlalchemy import select, func, desc
+    from app.models import Case, ConstitutionalDecision, Interpretation, SearchLog
+    
+    # 데이터 통계
+    case_result = await session.execute(select(func.count()).select_from(Case))
+    case_count = case_result.scalar() or 0
+    
+    constitutional_result = await session.execute(select(func.count()).select_from(ConstitutionalDecision))
+    constitutional_count = constitutional_result.scalar() or 0
+    
+    interpretation_result = await session.execute(select(func.count()).select_from(Interpretation))
+    interpretation_count = interpretation_result.scalar() or 0
+    
+    # 검색 통계
+    total_search_result = await session.execute(select(func.count()).select_from(SearchLog))
+    total_searches = total_search_result.scalar() or 0
+    
+    from datetime import datetime
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_result = await session.execute(
+        select(func.count()).select_from(SearchLog).where(SearchLog.created_at >= today)
+    )
+    today_searches = today_result.scalar() or 0
+    
+    avg_result = await session.execute(
+        select(func.avg(SearchLog.response_time_ms)).where(SearchLog.response_time_ms.isnot(None))
+    )
+    avg_response_time = avg_result.scalar()
+    
+    # 최근 검색어
+    recent_result = await session.execute(
+        select(SearchLog).order_by(desc(SearchLog.created_at)).limit(10)
+    )
+    recent_searches = recent_result.scalars().all()
+    
+    return templates.TemplateResponse(
+        "stats.html",
+        {
+            "request": request,
+            "case_count": f"{case_count:,}",
+            "constitutional_count": f"{constitutional_count:,}",
+            "interpretation_count": f"{interpretation_count:,}",
+            "total_count": f"{case_count + constitutional_count + interpretation_count:,}",
+            "total_searches": total_searches,
+            "today_searches": today_searches,
+            "avg_response_time": round(avg_response_time, 2) if avg_response_time else None,
+            "recent_searches": recent_searches
+        }
+    )
+
+
 # ===========================================
 # API 라우터 등록
 # ===========================================
@@ -258,6 +337,64 @@ async def case_detail(
             "case": case,
             "toc": toc,
             "summary": summary
+        }
+    )
+
+
+# ===========================================
+# 헌재결정례 상세 페이지 라우트
+# ===========================================
+
+@app.get("/constitutional/{decision_id}", response_class=HTMLResponse)
+async def constitutional_detail(
+    request: Request,
+    decision_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """헌재결정례 상세 페이지"""
+    service = ConstitutionalService(session)
+    decision = await service.get_decision_by_id(decision_id)
+    
+    if not decision:
+        return templates.TemplateResponse(
+            "constitutional/detail.html",
+            {"request": request, "decision": None, "error": "결정례를 찾을 수 없습니다"}
+        )
+    
+    return templates.TemplateResponse(
+        "constitutional/detail.html",
+        {
+            "request": request,
+            "decision": decision
+        }
+    )
+
+
+# ===========================================
+# 법령해석례 상세 페이지 라우트
+# ===========================================
+
+@app.get("/interpretations/{interpretation_id}", response_class=HTMLResponse)
+async def interpretation_detail(
+    request: Request,
+    interpretation_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """법령해석례 상세 페이지"""
+    service = InterpretationService(session)
+    interpretation = await service.get_interpretation_by_id(interpretation_id)
+    
+    if not interpretation:
+        return templates.TemplateResponse(
+            "interpretations/detail.html",
+            {"request": request, "interpretation": None, "error": "해석례를 찾을 수 없습니다"}
+        )
+    
+    return templates.TemplateResponse(
+        "interpretations/detail.html",
+        {
+            "request": request,
+            "interpretation": interpretation
         }
     )
 

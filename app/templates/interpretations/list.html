@@ -1,147 +1,170 @@
 {% extends "base.html" %}
 
-{% block title %}법령해석례 검색{% endblock %}
+{% block title %}법령해석례 검색 - JudicialSearch{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">법령해석례 검색</h1>
-    <p class="text-gray-600">법제처의 법령 해석에 관한 질의회신 사례를 검색합니다.</p>
-</div>
-
-<!-- 검색 폼 -->
-<form action="/interpretations" method="GET" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- 검색어 -->
-        <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">검색어</label>
-            <input 
-                type="text" 
-                name="q" 
-                value="{{ q or '' }}"
-                placeholder="안건명, 안건번호, 내용 검색"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-        </div>
-        
-        <!-- 분야 -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">분야</label>
-            <select name="field" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">전체</option>
-                <option value="일반행정">일반행정</option>
-                <option value="조세">조세</option>
-                <option value="환경">환경</option>
-                <option value="복지">복지</option>
-                <option value="노동">노동</option>
-                <option value="교육">교육</option>
-                <option value="건설">건설</option>
-                <option value="금융">금융</option>
-            </select>
-        </div>
-    </div>
-    
-    <div class="mt-4 flex justify-end">
-        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors">
-            검색
-        </button>
-    </div>
-</form>
-
-<!-- 검색 결과 -->
-{% if interpretations %}
-<div class="mb-4 flex justify-between items-center">
-    <p class="text-gray-600">
-        총 <span class="font-semibold">{{ total_count }}</span>건의 해석례
-    </p>
-</div>
-
-<div class="space-y-4">
-    {% for interp in interpretations %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 card-hover transition-all duration-200">
-        <div class="flex justify-between items-start mb-3">
-            <div>
-                {% if interp.분야 %}
-                <span class="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded mb-2">
-                    {{ interp.분야 }}
-                </span>
-                {% endif %}
+<div class="flex flex-col lg:flex-row gap-8">
+    <!-- 사이드바 필터 -->
+    <aside class="w-full lg:w-72 flex-shrink-0">
+        <div
+            class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sticky top-24">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    상세 필터
+                </h2>
+                <a href="/interpretations"
+                    class="text-xs text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-400">초기화</a>
             </div>
-            <span class="text-sm text-gray-500">{{ interp.회신일자 or '' }}</span>
-        </div>
-        
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">
-            <a href="/interpretations/{{ interp.법령해석례일련번호 }}" class="hover:text-green-600">
-                {{ interp.안건명 }}
-            </a>
-        </h3>
-        
-        <p class="text-sm text-gray-600 mb-3">
-            안건번호: {{ interp.안건번호 }}
-        </p>
-        
-        {% if interp.질의요지 %}
-        <p class="text-gray-700 text-sm line-clamp-3">
-            {{ interp.질의요지[:300] }}{% if interp.질의요지|length > 300 %}...{% endif %}
-        </p>
-        {% endif %}
-        
-        <div class="mt-4 flex space-x-3">
-            <a href="/interpretations/{{ interp.법령해석례일련번호 }}" class="text-green-600 text-sm hover:underline">
-                상세보기 →
-            </a>
-            <a href="/similarity?doc_type=interpretation&doc_id={{ interp.법령해석례일련번호 }}" class="text-blue-600 text-sm hover:underline">
-                유사해석례 찾기
-            </a>
-        </div>
-    </div>
-    {% endfor %}
-</div>
 
-<!-- 페이지네이션 -->
-{% if total_pages > 1 %}
-<nav class="mt-8 flex justify-center">
-    <ul class="flex space-x-2">
-        {% if page > 1 %}
-        <li>
-            <a href="?q={{ q or '' }}&page={{ page - 1 }}" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                이전
-            </a>
-        </li>
-        {% endif %}
-        
-        {% for p in range(1, total_pages + 1) %}
-            {% if p == page %}
-            <li>
-                <span class="px-4 py-2 bg-green-600 text-white rounded-lg">{{ p }}</span>
-            </li>
-            {% elif p <= 5 or p > total_pages - 5 or (p >= page - 2 and p <= page + 2) %}
-            <li>
-                <a href="?q={{ q or '' }}&page={{ p }}" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    {{ p }}
+            <form action="/interpretations" method="GET" class="space-y-8">
+                <input type="hidden" name="q" value="{{ q or '' }}">
+
+                <!-- 분야 필터 -->
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-3">분야</h3>
+                    <div class="space-y-2.5 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                        <label class="flex items-center group cursor-pointer">
+                            <input type="radio" name="field" value=""
+                                class="w-4 h-4 text-violet-600 border-slate-300 focus:ring-violet-500 dark:bg-slate-700 dark:border-slate-600"
+                                {% if not field %}checked{% endif %}>
+                            <span
+                                class="ml-3 text-sm text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200 transition-colors">전체</span>
+                        </label>
+                        {% for f in ['일반행정', '조세', '환경', '복지', '노동', '교육', '건설', '금융'] %}
+                        <label class="flex items-center group cursor-pointer">
+                            <input type="radio" name="field" value="{{ f }}"
+                                class="w-4 h-4 text-violet-600 border-slate-300 focus:ring-violet-500 dark:bg-slate-700 dark:border-slate-600"
+                                {% if field==f %}checked{% endif %}>
+                            <span
+                                class="ml-3 text-sm text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200 transition-colors">{{
+                                f }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button type="submit"
+                    class="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+                    필터 적용
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="flex-1 min-w-0">
+        <!-- 헤더 및 검색창 -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">법령해석례 검색</h1>
+            <p class="text-slate-500 dark:text-slate-400 mb-6">법제처의 법령 해석에 관한 질의회신 사례를 검색합니다.</p>
+
+            <!-- 검색 폼 -->
+            <form action="/interpretations" method="GET" class="relative">
+                <div class="relative flex items-center">
+                    <input type="text" name="q" value="{{ q or '' }}"
+                        class="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all duration-200"
+                        placeholder="안건명, 안건번호, 내용 검색">
+                    <div class="absolute left-4 text-slate-400">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <button type="submit"
+                        class="absolute right-3 px-6 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-colors">
+                        검색
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 검색 결과 -->
+        <div class="space-y-6">
+            <div class="flex items-center justify-between">
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                    총 <span class="font-bold text-slate-900 dark:text-white">{{ total_count }}</span>건의 해석례
+                </p>
+            </div>
+
+            {% if interpretations %}
+            <div class="space-y-4">
+                {% for interp in interpretations %}
+                <a href="/interpretations/{{ interp.법령해석례일련번호 }}"
+                    class="block bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-violet-300 dark:hover:border-violet-700 transition-all duration-200 group">
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        {% if interp.분야 %}
+                        <span
+                            class="px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-lg">
+                            {{ interp.분야 }}
+                        </span>
+                        {% endif %}
+                        <span class="text-xs text-slate-400 ml-auto">{{ interp.회신일자 or '' }}</span>
+                    </div>
+
+                    <h3
+                        class="text-xl font-bold text-slate-900 dark:text-white mb-2 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                        {{ interp.안건명 }}
+                    </h3>
+
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 flex items-center">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-slate-300 mr-2"></span>
+                        안건번호: {{ interp.안건번호 }}
+                    </p>
+
+                    {% if interp.질의요지 %}
+                    <div class="text-sm text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                        {{ interp.질의요지 | striptags }}
+                    </div>
+                    {% endif %}
                 </a>
-            </li>
-            {% endif %}
-        {% endfor %}
-        
-        {% if page < total_pages %}
-        <li>
-            <a href="?q={{ q or '' }}&page={{ page + 1 }}" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                다음
-            </a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
+                {% endfor %}
+            </div>
 
-{% else %}
-<!-- 검색 결과 없음 -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-    <svg class="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-    <h3 class="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
-    <p class="text-gray-600">다른 검색어로 시도해 보세요.</p>
+            <!-- 페이지네이션 -->
+            <div class="flex justify-center mt-12">
+                <nav class="flex items-center space-x-2">
+                    {% if page > 1 %}
+                    <a href="?page={{ page - 1 }}&q={{ q or '' }}&field={{ field or '' }}"
+                        class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </a>
+                    {% endif %}
+
+                    <span class="px-4 py-2 text-sm font-medium text-slate-900 dark:text-white">
+                        {{ page }} / {{ (total_count / 10) | round(0, 'ceil') | int }}
+                    </span>
+
+                    {% if interpretations|length == 10 %}
+                    <a href="?page={{ page + 1 }}&q={{ q or '' }}&field={{ field or '' }}"
+                        class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% else %}
+            <div
+                class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-16 text-center">
+                <div
+                    class="w-20 h-20 bg-slate-50 dark:bg-slate-700/50 rounded-full mx-auto mb-6 flex items-center justify-center text-slate-300">
+                    <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">검색 결과가 없습니다</h3>
+                <p class="text-slate-500 dark:text-slate-400">다른 검색어로 시도해 보세요.</p>
+            </div>
+            {% endif %}
+        </div>
+    </main>
 </div>
-{% endif %}
 {% endblock %}

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ case.case_name if case else '판례 상세' }} - JudicialSearch{% endblock %}
+{% block title %}{{ decision.사건명 if decision else '헌재결정례 상세' }} - JudicialSearch{% endblock %}
 
 {% block content %}
-{% if case %}
+{% if decision %}
 <div class="max-w-5xl mx-auto">
     <!-- 뒤로가기 -->
-    <a href="/cases"
+    <a href="/constitutional"
         class="inline-flex items-center text-sm text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-400 mb-8 transition-colors group">
         <svg class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24"
             stroke="currentColor">
@@ -15,7 +15,7 @@
         목록으로 돌아가기
     </a>
 
-    <!-- 판례 헤더 -->
+    <!-- 헤더 -->
     <div
         class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 mb-8 relative overflow-hidden">
         <div
@@ -27,16 +27,16 @@
                 <div class="flex items-center flex-wrap gap-2">
                     <span
                         class="px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded-lg">
-                        {{ case.court_name or '법원' }}
+                        {{ decision.사건종류명 or '헌재' }}
                     </span>
+                    {% if decision.판례결과 %}
                     <span
-                        class="px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded-lg">
-                        {{ case.case_type_name or '일반' }}
-                    </span>
-                    {% if case.judgment_type %}
-                    <span
-                        class="px-3 py-1 text-xs font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 rounded-lg">
-                        {{ case.judgment_type }}
+                        class="px-3 py-1 text-xs font-semibold 
+                        {% if '위헌' in decision.판례결과 %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300
+                        {% elif '합헌' in decision.판례결과 %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
+                        {% elif '각하' in decision.판례결과 %}bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300
+                        {% else %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% endif %} rounded-lg">
+                        {{ decision.판례결과 }}
                     </span>
                     {% endif %}
                 </div>
@@ -52,14 +52,14 @@
                     },
                     async checkBookmark() {
                         try {
-                            const res = await fetch(`/api/bookmarks/check?session_id=${this.sessionId}&entity_type=case&entity_id={{ case.id }}`);
+                            const res = await fetch(`/api/bookmarks/check?session_id=${this.sessionId}&entity_type=constitutional&entity_id={{ decision.결정례일련번호 }}`);
                             const data = await res.json();
                             this.isBookmarked = data.bookmarked;
                         } catch(e) { console.error(e); }
                     },
                     async toggleBookmark() {
                         if (this.isBookmarked) {
-                            await fetch(`/api/bookmarks?session_id=${this.sessionId}&entity_type=case&entity_id={{ case.id }}`, { method: 'DELETE' });
+                            await fetch(`/api/bookmarks?session_id=${this.sessionId}&entity_type=constitutional&entity_id={{ decision.결정례일련번호 }}`, { method: 'DELETE' });
                             this.isBookmarked = false;
                         } else {
                             await fetch('/api/bookmarks', {
@@ -67,10 +67,10 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     session_id: this.sessionId,
-                                    entity_type: 'case',
-                                    entity_id: {{ case.id }},
-                                    entity_title: '{{ case.case_name | replace("'", "\\'") }}',
-                                    entity_number: '{{ case.case_number }}'
+                                    entity_type: 'constitutional',
+                                    entity_id: {{ decision.결정례일련번호 }},
+                                    entity_title: '{{ decision.사건명 | replace("'", "\\'") }}',
+                                    entity_number: '{{ decision.사건번호 }}'
                                 })
                             });
                             this.isBookmarked = true;
@@ -97,26 +97,26 @@
                 </div>
             </div>
 
-            <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-4 leading-tight">{{ case.case_name }}</h1>
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white mb-4 leading-tight">{{ decision.사건명 }}</h1>
 
             <div
                 class="flex items-center text-sm text-slate-500 dark:text-slate-400 space-x-6 border-t border-slate-100 dark:border-slate-700/50 pt-6 mt-6">
                 <div class="flex items-center">
                     <span class="font-medium text-slate-700 dark:text-slate-300 mr-2">사건번호</span>
-                    {{ case.case_number }}
+                    {{ decision.사건번호 }}
                 </div>
                 <div class="flex items-center">
                     <span class="font-medium text-slate-700 dark:text-slate-300 mr-2">선고일자</span>
-                    {{ case.judgment_date }}
+                    {{ decision.선고일 }}
                 </div>
                 <div class="ml-auto">
-                    <a href="/similarity?doc_type=case&doc_id={{ case.id }}"
+                    <a href="/similarity?doc_type=constitutional&doc_id={{ decision.결정례일련번호 }}"
                         class="inline-flex items-center text-violet-600 hover:text-violet-700 font-medium transition-colors">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        유사판례 분석
+                        유사결정례 분석
                     </a>
                 </div>
             </div>
@@ -131,12 +131,17 @@
                 <button @click="activeTab = 'summary'"
                     :class="activeTab === 'summary' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
                     class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
-                    요지
+                    결정요지
                 </button>
-                <button @click="activeTab = 'full'"
-                    :class="activeTab === 'full' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                <button @click="activeTab = 'ruling'"
+                    :class="activeTab === 'ruling' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
                     class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
-                    전문
+                    주문
+                </button>
+                <button @click="activeTab = 'reasoning'"
+                    :class="activeTab === 'reasoning' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
+                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
+                    이유
                 </button>
                 <button @click="activeTab = 'provisions'"
                     :class="activeTab === 'provisions' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
@@ -148,67 +153,57 @@
                     class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
                     참조판례
                 </button>
-                <button @click="activeTab = 'cited'"
-                    :class="activeTab === 'cited' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
-                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
-                    인용판례
-                </button>
-                <button @click="activeTab = 'similar'"
-                    :class="activeTab === 'similar' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'"
-                    class="px-6 py-4 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap">
-                    유사판례
-                </button>
             </nav>
         </div>
 
         <!-- 탭 콘텐츠 -->
         <div class="p-8">
-            <!-- 요지 탭 -->
-            <div x-show="activeTab === 'summary'" class="space-y-8 animate-fade-in">
-                {% if case.summary %}
+            <!-- 결정요지 탭 -->
+            <div x-show="activeTab === 'summary'" class="animate-fade-in">
+                {% if decision.결정요지 %}
                 <div>
                     <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center">
                         <span class="w-1 h-6 bg-violet-500 rounded-full mr-3"></span>
-                        판시사항
+                        결정요지
                     </h3>
                     <div
                         class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-700">
-                        {{ case.summary | safe }}
+                        {{ decision.결정요지 | safe }}
                     </div>
                 </div>
-                {% endif %}
-
-                {% if case.gist %}
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center">
-                        <span class="w-1 h-6 bg-indigo-500 rounded-full mr-3"></span>
-                        판결요지
-                    </h3>
-                    <div
-                        class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-700">
-                        {{ case.gist | safe }}
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if not case.summary and not case.gist %}
+                {% else %}
                 <div class="text-center py-12 text-slate-500 dark:text-slate-400">
-                    요지 정보가 없습니다.
+                    결정요지 정보가 없습니다.
                 </div>
                 {% endif %}
             </div>
 
-            <!-- 전문 탭 -->
-            <div x-show="activeTab === 'full'" x-cloak class="animate-fade-in">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">판례 전문</h3>
-                {% if case.full_text %}
+            <!-- 주문 탭 -->
+            <div x-show="activeTab === 'ruling'" x-cloak class="animate-fade-in">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">주문</h3>
+                {% if decision.주문 %}
                 <div
                     class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose whitespace-pre-wrap font-serif">
-                    {{ case.full_text | safe }}
+                    {{ decision.주문 | safe }}
                 </div>
                 {% else %}
                 <div class="text-center py-12 text-slate-500 dark:text-slate-400">
-                    전문 정보가 없습니다.
+                    주문 정보가 없습니다.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 이유 탭 -->
+            <div x-show="activeTab === 'reasoning'" x-cloak class="animate-fade-in">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">이유</h3>
+                {% if decision.이유 %}
+                <div
+                    class="prose prose-slate dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-loose whitespace-pre-wrap font-serif">
+                    {{ decision.이유 | safe }}
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                    이유 정보가 없습니다.
                 </div>
                 {% endif %}
             </div>
@@ -216,14 +211,14 @@
             <!-- 참조조문 탭 -->
             <div x-show="activeTab === 'provisions'" x-cloak class="animate-fade-in">
                 <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">참조조문</h3>
-                {% if case.reference_provisions %}
+                {% if decision.참조조문 %}
                 <div class="grid grid-cols-1 gap-3">
-                    {% for provision in case.reference_provisions.split('\n') %}
+                    {% for provision in decision.참조조문.split('\n') %}
                     {% if provision.strip() %}
-                    <a href="/laws/search?q={{ provision | urlencode }}"
-                        class="block p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 text-slate-700 dark:text-slate-300">
+                    <div
+                        class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                         {{ provision.strip() }}
-                    </a>
+                    </div>
                     {% endif %}
                     {% endfor %}
                 </div>
@@ -237,14 +232,14 @@
             <!-- 참조판례 탭 -->
             <div x-show="activeTab === 'cases'" x-cloak class="animate-fade-in">
                 <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">참조판례</h3>
-                {% if case.reference_cases %}
+                {% if decision.참조판례 %}
                 <div class="grid grid-cols-1 gap-3">
-                    {% for ref_case in case.reference_cases.split('\n') %}
+                    {% for ref_case in decision.참조판례.split('\n') %}
                     {% if ref_case.strip() %}
-                    <a href="/cases/search?q={{ ref_case | urlencode }}"
-                        class="block p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 text-slate-700 dark:text-slate-300">
+                    <div
+                        class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                         {{ ref_case.strip() }}
-                    </a>
+                    </div>
                     {% endif %}
                     {% endfor %}
                 </div>
@@ -253,69 +248,6 @@
                     참조판례 정보가 없습니다.
                 </div>
                 {% endif %}
-            </div>
-
-            <!-- 인용판례 탭 -->
-            <div x-show="activeTab === 'cited'" x-cloak class="animate-fade-in">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">인용판례</h3>
-                <div
-                    class="text-center py-12 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                    <p>이 판례를 인용한 다른 판례 목록입니다.</p>
-                    <p class="text-sm mt-2 text-slate-400">(데이터 준비 중)</p>
-                </div>
-            </div>
-
-            <!-- 유사판례 탭 -->
-            <div x-show="activeTab === 'similar'" x-cloak x-data="{ 
-                    similarCases: [],
-                    loading: true,
-                    async loadSimilar() {
-                        try {
-                            const res = await fetch('/api/similarity/by-case/{{ case.id }}?top_k=5');
-                            const data = await res.json();
-                            this.similarCases = data.similar_cases || [];
-                        } catch(e) { console.error(e); }
-                        this.loading = false;
-                    }
-                 }" x-init="loadSimilar()" class="animate-fade-in">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">AI 유사판례</h3>
-
-                <template x-if="loading">
-                    <div class="flex flex-col items-center justify-center py-12">
-                        <div
-                            class="w-8 h-8 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mb-4">
-                        </div>
-                        <p class="text-slate-500 dark:text-slate-400">AI가 판례 내용을 분석하여 유사한 판례를 찾고 있습니다...</p>
-                    </div>
-                </template>
-
-                <template x-if="!loading && similarCases.length === 0">
-                    <div class="text-center py-12 text-slate-500 dark:text-slate-400">
-                        유사한 판례를 찾을 수 없습니다.
-                    </div>
-                </template>
-
-                <div x-show="!loading && similarCases.length > 0" class="grid grid-cols-1 gap-4">
-                    <template x-for="c in similarCases" :key="c.id">
-                        <a :href="`/cases/${c.id}`"
-                            class="block p-5 bg-white dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-violet-300 dark:hover:border-violet-600 transition-all duration-200 group">
-                            <div class="flex justify-between items-start mb-2">
-                                <div>
-                                    <h4 class="font-bold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors"
-                                        x-text="c.case_name"></h4>
-                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1"
-                                        x-text="c.court_name + ' · ' + c.judgment_date"></p>
-                                </div>
-                                <div class="flex flex-col items-end">
-                                    <span
-                                        class="px-2.5 py-1 text-xs font-bold bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 rounded-lg border border-violet-100 dark:border-violet-800">
-                                        <span x-text="(c.similarity_score * 100).toFixed(0) + '%'"></span> 일치
-                                    </span>
-                                </div>
-                            </div>
-                        </a>
-                    </template>
-                </div>
             </div>
         </div>
     </div>
@@ -332,9 +264,9 @@
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
     </div>
-    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ error or '판례를 찾을 수 없습니다' }}</h3>
-    <p class="text-slate-500 dark:text-slate-400 mb-8">요청하신 판례가 존재하지 않거나 삭제되었을 수 있습니다.</p>
-    <a href="/cases"
+    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{{ error or '결정례를 찾을 수 없습니다' }}</h3>
+    <p class="text-slate-500 dark:text-slate-400 mb-8">요청하신 결정례가 존재하지 않거나 삭제되었을 수 있습니다.</p>
+    <a href="/constitutional"
         class="inline-flex items-center px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-xl transition-colors shadow-sm">
         목록으로 돌아가기
     </a>

@@ -25,7 +25,7 @@ from ml.faiss_index import FAISSIndex
 
 
 async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, display: int = 100, 
-                               embedding_service=None, faiss_index=None):
+                               embedding_service=None, faiss_index=None, concurrency: int = 5):
     """
     판례 데이터 수집 및 저장 + 벡터화
     
@@ -37,6 +37,7 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
         faiss_index: FAISS 인덱스 (None이면 벡터화 스킵)
     """
     print("\n📚 판례 데이터 수집 시작...")
+    print(f"   ⚡ 병렬 처리: 동시 {concurrency}건")
     do_vectorize = embedding_service is not None and faiss_index is not None
     if do_vectorize:
         print("   🧠 벡터화 모드: 수집하면서 바로 FAISS 인덱스 빌드")
@@ -82,67 +83,92 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                     break
                 
                 total_items = len(result["items"])
-                print(f"    📋 {total_items}건 발견됨")
+                print(f"    📋 {total_items}건 발견됨, 병렬 처리 시작...")
                 
-                for idx, item in enumerate(result["items"], 1):
-                    # 상세 조회
-                    serial_no = int(item.get("판례일련번호", 0))
-                    if serial_no <= 0:
+                # 병렬 처리용 Semaphore
+                semaphore = asyncio.Semaphore(concurrency)
+                
+                async def process_single_case(item):
+                    """단일 판례 처리 (병렬 실행됨)"""
+                    async with semaphore:
+                        serial_no = int(item.get("판례일련번호", 0))
+                        if serial_no <= 0:
+                            return None
+                        
+                        try:
+                            # XML API 시도 → 실패 시 HTML + Selenium fallback
+                            detail = await client.get_case_detail_with_fallback(serial_no)
+                            
+                            # 사건번호에서 법원명 파싱
+                            raw_case_number = item.get("사건번호", "")
+                            parsed = LawAPIClient.parse_case_title(raw_case_number)
+                            
+                            # 법원명 결정
+                            court_name = item.get("법원명") or ""
+                            if not court_name and parsed["court_name"]:
+                                court_name = parsed["court_name"]
+                            if not court_name:
+                                court_name = LawAPIClient.extract_court_from_case_number(parsed["case_number"])
+                            if not court_name:
+                                court_name = "알 수 없음"
+                            
+                            case_number = parsed["case_number"] if parsed["case_number"] else raw_case_number
+                            judgment_type = item.get("선고") or detail.get("선고") or item.get("판결유형") or ""
+                            
+                            case_data = {
+                                "case_serial_number": serial_no,
+                                "case_number": case_number,
+                                "case_type_code": item.get("사건종류코드"),
+                                "case_type_name": item.get("사건종류명"),
+                                "court_name": court_name,
+                                "court_type_code": item.get("법원종류코드"),
+                                "judgment_type": judgment_type,
+                                "case_name": item.get("사건명") or "제목 없음",
+                                "decision_type": detail.get("판결유형") or item.get("판결유형"),
+                                "summary": detail.get("판시사항"),
+                                "gist": detail.get("판결요지"),
+                                "reference_provisions": detail.get("참조조문"),
+                                "reference_cases": detail.get("참조판례"),
+                                "full_text": detail.get("판례내용"),
+                            }
+                            
+                            if item.get("선고일자"):
+                                try:
+                                    case_data["judgment_date"] = datetime.strptime(
+                                        item["선고일자"], "%Y.%m.%d"
+                                    ).date()
+                                except:
+                                    pass
+                            
+                            return {"success": True, "serial_no": serial_no, "case_data": case_data, "item": item}
+                            
+                        except Exception as e:
+                            return {"success": False, "serial_no": serial_no, "error": str(e)[:100]}
+                
+                # 모든 아이템 병렬 처리
+                tasks = [process_single_case(item) for item in result["items"]]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 결과 처리 (DB 저장은 순차적으로)
+                for res in results:
+                    if res is None:
+                        continue
+                    if isinstance(res, Exception):
+                        total_errors += 1
+                        page_errors += 1
                         continue
                     
+                    if not res.get("success"):
+                        total_errors += 1
+                        page_errors += 1
+                        print(f"\r    ❌ 판례 {res.get('serial_no')} 처리 실패: {res.get('error')}")
+                        continue
+                    
+                    serial_no = res["serial_no"]
+                    case_data = res["case_data"]
+                    
                     try:
-                        print(f"\r    ⏳ 처리 중... ({total_saved + 1}/{total_count:,}건)", end="", flush=True)
-                        
-                        # XML API 시도 → 실패 시 HTML + Selenium fallback
-                        detail = await client.get_case_detail_with_fallback(serial_no)
-                        
-                        # 사건번호에서 법원명 파싱 (예: "대법원-2025-두-34568" → court_name="대법원", case_number="2025두34568")
-                        raw_case_number = item.get("사건번호", "")
-                        parsed = LawAPIClient.parse_case_title(raw_case_number)
-                        
-                        # 법원명 결정: 1) 원본 법원명 2) 사건번호에서 파싱 3) 사건번호 종류에서 추정
-                        court_name = item.get("법원명") or ""
-                        if not court_name and parsed["court_name"]:
-                            court_name = parsed["court_name"]
-                        if not court_name:
-                            court_name = LawAPIClient.extract_court_from_case_number(parsed["case_number"])
-                        if not court_name:
-                            court_name = "알 수 없음"
-                        
-                        # 사건번호 정규화 (하이픈 제거된 형태)
-                        case_number = parsed["case_number"] if parsed["case_number"] else raw_case_number
-                        
-                        # UPSERT (있으면 업데이트, 없으면 삽입)
-                        # judgment_type: 목록 API "선고" → 상세조회 "선고" → 목록 "판결유형" 순으로 시도
-                        judgment_type = item.get("선고") or detail.get("선고") or item.get("판결유형") or ""
-                        
-                        case_data = {
-                            "case_serial_number": serial_no,
-                            "case_number": case_number,
-                            "case_type_code": item.get("사건종류코드"),
-                            "case_type_name": item.get("사건종류명"),
-                            "court_name": court_name,
-                            "court_type_code": item.get("법원종류코드"),
-                            "judgment_type": judgment_type,
-                            "case_name": item.get("사건명") or "제목 없음",
-                            "decision_type": detail.get("판결유형") or item.get("판결유형"),
-                            "summary": detail.get("판시사항"),
-                            "gist": detail.get("판결요지"),
-                            "reference_provisions": detail.get("참조조문"),
-                            "reference_cases": detail.get("참조판례"),
-                            "full_text": detail.get("판례내용"),
-                        }
-                        
-                        # 선고일자 파싱
-                        if item.get("선고일자"):
-                            try:
-                                case_data["judgment_date"] = datetime.strptime(
-                                    item["선고일자"], "%Y.%m.%d"
-                                ).date()
-                            except:
-                                pass
-                        
-                        # 기존 데이터 확인
+                        # DB 저장
                         existing = await session.execute(
                             select(Case).where(Case.case_serial_number == serial_no)
                         )
@@ -156,10 +182,10 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                         else:
                             new_case = Case(**case_data)
                             session.add(new_case)
-                            await session.flush()  # ID 생성을 위해 flush
+                            await session.flush()
                             db_id = new_case.id
                         
-                        # 벡터화용 텍스트 생성 (사건명 + 판시사항 + 판결요지)
+                        # 벡터화용 텍스트 생성
                         if do_vectorize:
                             search_text_parts = []
                             if case_data.get("case_name"):
@@ -180,11 +206,8 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                     except Exception as e:
                         total_errors += 1
                         page_errors += 1
-                        print(f"\r    ❌ 판례 {serial_no} 처리 실패: {str(e)[:100]}")
+                        print(f"\r    ❌ 판례 {serial_no} DB 저장 실패: {str(e)[:100]}")
                         continue
-                    
-                    # API 요청 간격 조절
-                    await asyncio.sleep(0.1)
                 
                 print(f"\r    ✅ 페이지 완료: 성공 {page_success}건, 실패 {page_errors}건" + " " * 20)
                 await session.commit()
@@ -216,11 +239,12 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
 
 
 async def fetch_and_save_constitutional(client: LawAPIClient, max_pages: int = None, display: int = 100,
-                                        embedding_service=None, faiss_index=None):
+                                        embedding_service=None, faiss_index=None, concurrency: int = 5):
     """
     헌재결정례 데이터 수집 및 저장 + 벡터화
     """
     print("\n⚖️ 헌재결정례 데이터 수집 시작...")
+    print(f"   ⚡ 병렬 처리: 동시 {concurrency}건")
     do_vectorize = embedding_service is not None and faiss_index is not None
     if do_vectorize:
         print("   🧠 벡터화 모드: 수집하면서 바로 FAISS 인덱스 빌드")
@@ -367,7 +391,7 @@ async def fetch_and_save_constitutional(client: LawAPIClient, max_pages: int = N
 
 
 async def fetch_and_save_interpretations(client: LawAPIClient, max_pages: int = None, display: int = 100,
-                                         embedding_service=None, faiss_index=None):
+                                         embedding_service=None, faiss_index=None, concurrency: int = 5):
     """
     법령해석례 데이터 수집 및 저장 + 벡터화
     """
@@ -747,6 +771,8 @@ async def main():
                        help='페이지당 항목 수')
     parser.add_argument('--no-vectorize', action='store_true',
                        help='벡터화 비활성화 (DB 저장만)')
+    parser.add_argument('--concurrency', type=int, default=5,
+                       help='동시 처리 개수 (기본값: 5)')
     
     args = parser.parse_args()
     
@@ -757,6 +783,7 @@ async def main():
     print(f"   최대 페이지: {'모든 데이터' if args.limit is None else f'{args.limit}페이지'}")
     print(f"   페이지당: {args.display}건")
     print(f"   벡터화: {'비활성화' if args.no_vectorize else '활성화'}")
+    print(f"   동시 처리: {args.concurrency}건")
     print("=" * 60)
     
     # 임베딩 서비스 및 FAISS 인덱스 초기화
@@ -796,19 +823,19 @@ async def main():
         if args.target == 'prec' or args.target == 'all':
             cases_count = await fetch_and_save_cases(
                 client, args.limit, args.display, 
-                embedding_service, case_index
+                embedding_service, case_index, args.concurrency
             )
         
         if args.target == 'detc' or args.target == 'all':
             constitutional_count = await fetch_and_save_constitutional(
                 client, args.limit, args.display,
-                embedding_service, constitutional_index
+                embedding_service, constitutional_index, args.concurrency
             )
         
         if args.target == 'expc' or args.target == 'all':
             interpretations_count = await fetch_and_save_interpretations(
                 client, args.limit, args.display,
-                embedding_service, interpretation_index
+                embedding_service, interpretation_index, args.concurrency
             )
         
         if args.target == 'law' or args.target == 'all':
