@@ -5,6 +5,7 @@ HTML Fallback 크롤링 지원
 Selenium을 통한 JS 렌더링 페이지 파싱 지원
 """
 import asyncio
+import json
 import os
 import re
 import time
@@ -99,6 +100,90 @@ class LawAPIClient:
         
         return result
     
+    def _parse_json(self, json_text: str) -> Dict[str, Any]:
+        """
+        JSON 응답을 딕셔너리로 변환
+        
+        법제처 API JSON 응답 구조:
+        - 목록 조회: {"PrecSearch": {"prec": [...], "totalCnt": "123"}}
+        - 상세 조회: {"PrecService": {"사건명": "...", "판례내용": "..."}}
+        
+        Args:
+            json_text: JSON 문자열
+            
+        Returns:
+            파싱된 딕셔너리
+        """
+        try:
+            data = json.loads(json_text)
+        except json.JSONDecodeError as e:
+            print(f"JSON 파싱 실패: {e}")
+            print(f"응답 내용 (앞 500자): {json_text[:500]}")
+            # XML 응답이 왔을 수 있음 - fallback
+            if json_text.strip().startswith("<?xml") or json_text.strip().startswith("<"):
+                print("XML 응답 감지, XML 파서로 fallback")
+                return self._parse_xml(json_text)
+            raise
+        
+        result = {
+            "totalCnt": 0,
+            "items": []
+        }
+        
+        # 목록 조회 응답 (~Search 키 안에 데이터가 있음)
+        # 예: PrecSearch, DetcSearch, ExpcSearch, LawSearch, LstrmSearch
+        search_keys = ["PrecSearch", "DetcSearch", "ExpcSearch", "LawSearch", "LstrmSearch"]
+        list_keys = ["prec", "Detc", "expc", "law", "lstrm"]
+        
+        for search_key in search_keys:
+            if search_key in data and isinstance(data[search_key], dict):
+                search_data = data[search_key]
+                
+                # totalCnt 파싱
+                if "totalCnt" in search_data:
+                    result["totalCnt"] = int(search_data["totalCnt"])
+                
+                # 목록 아이템 파싱
+                for list_key in list_keys:
+                    if list_key in search_data:
+                        items = search_data[list_key]
+                        if isinstance(items, dict):
+                            items = [items]
+                        if isinstance(items, list):
+                            result["items"].extend(items)
+        
+        # 직접 목록 키가 있는 경우 (fallback)
+        if not result["items"]:
+            for key in list_keys:
+                if key in data:
+                    items = data[key]
+                    if isinstance(items, dict):
+                        items = [items]
+                    if isinstance(items, list):
+                        result["items"].extend(items)
+            
+            # totalCnt 직접 파싱
+            if "totalCnt" in data:
+                result["totalCnt"] = int(data["totalCnt"])
+        
+        # 상세 조회 응답인 경우 (~Service 키 안에 데이터가 있음)
+        # 예: PrecService, DetcService, ExpcService, LawService, LstrmService
+        service_keys = ["PrecService", "DetcService", "ExpcService", "LawService", "LstrmService"]
+        for key in service_keys:
+            if key in data and isinstance(data[key], dict):
+                # Service 안의 데이터를 result에 복사
+                for k, v in data[key].items():
+                    result[k] = v
+        
+        # 상세 조회 응답인 경우 (직접 필드가 있는 경우 - fallback)
+        if not result["items"] and not any(k in result for k in ["사건명", "판례내용", "판결요지"]):
+            exclude_keys = ["totalCnt", "page", "numOfRows"] + search_keys + service_keys
+            for key, value in data.items():
+                if key not in exclude_keys:
+                    result[key] = value
+        
+        return result
+    
     async def _request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         API 요청 실행
@@ -113,10 +198,10 @@ class LawAPIClient:
         if not self._session:
             raise RuntimeError("클라이언트가 초기화되지 않았습니다. async with 문을 사용하세요.")
         
-        # 기본 파라미터 추가
+        # 기본 파라미터 추가 (JSON으로 요청)
         params = {
             "OC": self.oc,
-            "type": "XML",
+            "type": "JSON",
             **params
         }
         
@@ -126,7 +211,7 @@ class LawAPIClient:
             async with self._session.get(url, params=params) as response:
                 response.raise_for_status()
                 text = await response.text()
-                return self._parse_xml(text)
+                return self._parse_json(text)
         except aiohttp.ClientError as e:
             print(f"API 요청 실패: {e}")
             raise
@@ -445,6 +530,7 @@ class LawAPIClient:
             "사건번호": "",
             "선고일자": "",
             "법원명": "",
+            "판결유형": "",
             "판시사항": "",
             "판결요지": "",
             "참조조문": "",
@@ -524,7 +610,16 @@ class LawAPIClient:
     def _parse_external_page(self, html: str, case_serial_number: int) -> Dict[str, Any]:
         """
         외부 시스템 페이지 파싱 (국세법령정보시스템 등)
-        다양한 HTML 구조에 대응
+        
+        국세법령정보시스템 HTML 구조:
+        - 사건명: div.title > strong.bold
+        - 판결유형: div.title > em.com_badge (예: "국승", "국패")
+        - 사건번호: div.bo_head ul > li:first > strong
+        - 생산일자: "생산일자" li > span.num
+        - 참조조문: div.rel_group > div > a
+        - 요지: div[data-center-type="body_content_gist"] > p
+        - 판결내용: div[data-center-type="body_content_cntn"] > p
+        - 상세내용: div#cntnWrap_html
         """
         soup = BeautifulSoup(html, 'html.parser')
         
@@ -534,6 +629,7 @@ class LawAPIClient:
             "사건번호": "",
             "선고일자": "",
             "법원명": "",
+            "판결유형": "",
             "판시사항": "",
             "판결요지": "",
             "참조조문": "",
@@ -541,84 +637,144 @@ class LawAPIClient:
             "판례내용": "",
         }
         
-        # 텍스트 전체 추출 (fallback용)
+        # ========================================
+        # 국세법령정보시스템 구조 파싱
+        # ========================================
+        
+        # 사건명: div.title > strong.bold
+        title_div = soup.find('div', class_='title')
+        if title_div:
+            title_strong = title_div.find('strong', class_='bold')
+            if title_strong:
+                result["사건명"] = title_strong.get_text(strip=True)
+        
+        # 판결유형: div.title > em.com_badge (국승, 국패 등)
+        if title_div:
+            badge = title_div.find('em', class_='com_badge')
+            if badge:
+                badge_text = badge.get_text(strip=True)
+                # 국승 -> 처분청 승소, 국패 -> 처분청 패소
+                if badge_text == "국승":
+                    result["판결유형"] = "처분청 승소"
+                elif badge_text == "국패":
+                    result["판결유형"] = "처분청 패소"
+                else:
+                    result["판결유형"] = badge_text
+        
+        # 사건번호, 선고일자: bo_head 영역의 ul > li들
+        bo_head = soup.find('div', class_='bo_head')
+        if bo_head:
+            li_items = bo_head.find_all('li')
+            for li in li_items:
+                strong = li.find('strong')
+                if strong:
+                    label = strong.get_text(strip=True)
+                    
+                    # 첫번째 li의 strong이 사건번호 (대법원-2025-두-34568)
+                    if '-' in label and any(c.isdigit() for c in label):
+                        result["사건번호"] = label
+                    
+                    # 생산일자 = 선고일자
+                    if "생산일자" in label:
+                        span = li.find('span', class_='num')
+                        if span:
+                            date_text = span.get_text(strip=True).replace('.', '')
+                            if len(date_text) >= 8:
+                                result["선고일자"] = date_text[:8]
+        
+        # 참조조문: div.rel_group > div > a 링크들
+        rel_group = soup.find('div', class_='rel_group')
+        if rel_group:
+            links = rel_group.find_all('a', class_='txt_link')
+            refs = [a.get_text(strip=True) for a in links]
+            if refs:
+                result["참조조문"] = ', '.join(refs)
+        
+        # 요지 (판결요지): div[data-center-type="body_content_gist"]
+        gist_div = soup.find('div', {'data-center-type': 'body_content_gist'})
+        if gist_div:
+            p_tag = gist_div.find('p')
+            if p_tag:
+                result["판결요지"] = p_tag.get_text(strip=True)
+        
+        # 판결내용 (간략): div[data-center-type="body_content_cntn"]
+        cntn_div = soup.find('div', {'data-center-type': 'body_content_cntn'})
+        if cntn_div:
+            p_tag = cntn_div.find('p')
+            if p_tag:
+                content = p_tag.get_text(separator='\n', strip=True)
+                if content:
+                    result["판례내용"] = content
+        
+        # 상세내용 (전문): div#cntnWrap_html - 더 자세한 내용
+        html_cntn = soup.find('div', id='cntnWrap_html')
+        if html_cntn:
+            full_content = html_cntn.get_text(separator='\n', strip=True)
+            if full_content and len(full_content) > len(result.get("판례내용", "")):
+                result["판례내용"] = full_content[:15000]  # 최대 15000자
+        
+        # 법원명 추출: 사건번호에서 또는 텍스트에서
+        if result["사건번호"]:
+            if "대법원" in result["사건번호"]:
+                result["법원명"] = "대법원"
+            elif "고등법원" in result["사건번호"]:
+                result["법원명"] = "고등법원"
+        
+        if not result["법원명"]:
+            full_text = soup.get_text()
+            court_match = re.search(r'(대법원|서울고등법원|고등법원|지방법원|행정법원)', full_text)
+            if court_match:
+                result["법원명"] = court_match.group(1)
+        
+        # ========================================
+        # Fallback: 텍스트 기반 파싱 (위에서 못 찾은 경우)
+        # ========================================
         full_text = soup.get_text(separator='\n', strip=True)
         
-        # === 사건번호 패턴 ===
-        case_patterns = [
-            r'(\d{4}[가-힣]+\d+)',  # 2024두12345
-            r'(\d{4})\s*[.\-]\s*(\d{1,2})\s*[.\-]\s*(\d{1,2})',  # 날짜 패턴
-        ]
+        # 사건명 fallback
+        if not result["사건명"]:
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text(strip=True)
+                if title_text and len(title_text) < 200:
+                    result["사건명"] = title_text
         
-        for pattern in case_patterns:
-            match = re.search(pattern, full_text)
-            if match:
-                if len(match.groups()) == 1:
-                    result["사건번호"] = match.group(1)
-                break
+        # 사건번호 fallback
+        if not result["사건번호"]:
+            case_match = re.search(r'(\d{4}[가-힣]+\d+)', full_text)
+            if case_match:
+                result["사건번호"] = case_match.group(1)
         
-        # === 법원명 ===
-        court_match = re.search(r'(대법원|고등법원|지방법원|행정법원|가정법원|회생법원|특허법원|\S+지원)', full_text)
-        if court_match:
-            result["법원명"] = court_match.group(1)
+        # 선고일자 fallback
+        if not result["선고일자"]:
+            date_patterns = [
+                r'선고일자[:\s-]*(\d{4})\.?(\d{1,2})\.?(\d{1,2})',
+                r'(\d{4})\.(\d{1,2})\.(\d{1,2})\.?\s*선고',
+            ]
+            for pattern in date_patterns:
+                match = re.search(pattern, full_text)
+                if match:
+                    result["선고일자"] = f"{match.group(1)}{match.group(2).zfill(2)}{match.group(3).zfill(2)}"
+                    break
         
-        # === 선고일자 ===
-        date_patterns = [
-            r'선고\s*(\d{4})[.\-\s]*(\d{1,2})[.\-\s]*(\d{1,2})',
-            r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*선고',
-            r'판결\s*선고\s*(\d{4})[.\-\s]*(\d{1,2})[.\-\s]*(\d{1,2})',
-        ]
+        # 판결유형 fallback
+        if not result["판결유형"]:
+            verdict_patterns = [
+                r'(처분청\s*승소|처분청\s*패소)',
+                r'(원고\s*승소|원고\s*패소|피고\s*승소|피고\s*패소)',
+                r'(상고\s*기각|상고\s*인용|파기\s*환송)',
+            ]
+            for pattern in verdict_patterns:
+                match = re.search(pattern, full_text)
+                if match:
+                    result["판결유형"] = match.group(1).replace(' ', '')
+                    break
         
-        for pattern in date_patterns:
-            match = re.search(pattern, full_text)
-            if match:
-                result["선고일자"] = f"{match.group(1)}{match.group(2).zfill(2)}{match.group(3).zfill(2)}"
-                break
-        
-        # === 사건명 (제목) ===
-        title_tags = soup.find_all(['h1', 'h2', 'h3', 'title'])
-        for tag in title_tags:
-            text = tag.get_text(strip=True)
-            if text and len(text) > 3 and len(text) < 100:
-                result["사건명"] = text
-                break
-        
-        # === 요지/판결요지 ===
-        yoji_patterns = [
-            r'요\s*지\s*[:：]?\s*(.+?)(?=주\s*문|참조|관련|$)',
-            r'판결요지\s*[:：]?\s*(.+?)(?=주\s*문|참조|관련|$)',
-        ]
-        
-        for pattern in yoji_patterns:
-            match = re.search(pattern, full_text, re.DOTALL)
-            if match:
-                yoji = match.group(1).strip()[:2000]  # 최대 2000자
-                result["판결요지"] = yoji
-                break
-        
-        # === 주문 ~ 판례내용 ===
-        content_patterns = [
-            r'(주\s*문.+)',
-            r'(【주\s*문】.+)',
-        ]
-        
-        for pattern in content_patterns:
-            match = re.search(pattern, full_text, re.DOTALL)
-            if match:
-                content = match.group(1).strip()[:10000]  # 최대 10000자
-                result["판례내용"] = content
-                break
-        
-        # === 참조조문 ===
-        ref_match = re.search(r'참조조문\s*[:：]?\s*(.+?)(?=참조판례|주\s*문|$)', full_text, re.DOTALL)
-        if ref_match:
-            result["참조조문"] = ref_match.group(1).strip()[:1000]
-        
-        # === 관련법령 (참조조문 대체) ===
-        if not result["참조조문"]:
-            law_match = re.search(r'관련\s*법령\s*[:：]?\s*(.+?)(?=요지|주\s*문|$)', full_text, re.DOTALL)
-            if law_match:
-                result["참조조문"] = law_match.group(1).strip()[:1000]
+        # 판례내용 fallback
+        if not result["판례내용"]:
+            content_match = re.search(r'(주\s*문.+)', full_text, re.DOTALL)
+            if content_match:
+                result["판례내용"] = content_match.group(1).strip()[:15000]
         
         return result
     
@@ -726,10 +882,6 @@ class LawAPIClient:
         try:
             result = await self.get_case_detail(case_serial_number)
             
-            # 정상 응답 확인 (사건명이 있으면 성공)
-            if result.get("사건명"):
-                return result
-            
             # 오류 응답 확인 (다양한 오류 패턴)
             error_messages = ["일치하는 판례가 없습니다", "데이터가 없습니다", "조회된 데이터가 없습니다"]
             result_str = str(result)
@@ -739,7 +891,17 @@ class LawAPIClient:
                     print(f"XML API 오류 응답 (ID: {case_serial_number}), HTML 크롤링으로 대체")
                     return await self.get_case_detail_html(case_serial_number)
             
-            # 사건명이 없고 오류 메시지도 없으면 그냥 반환
+            # 핵심 콘텐츠 확인 (사건명 + 본문 중 하나라도 있어야 정상)
+            has_content = bool(
+                result.get("판례내용") or 
+                result.get("판결요지") or 
+                result.get("판시사항")
+            )
+            
+            if not has_content:
+                print(f"XML API 본문 없음 (ID: {case_serial_number}), HTML 크롤링으로 대체")
+                return await self.get_case_detail_html(case_serial_number)
+            
             return result
             
         except Exception as e:
@@ -757,6 +919,12 @@ class LawAPIClient:
         
         예시: 
             "서울고등법원-2022-누-38108" → {"court_name": "서울고등법원", "case_number": "2022누38108"}
+            "서울고등법원(인천)-2025-누-10220" → {"court_name": "서울고등법원(인천)", "case_number": "2025누10220"}
+            "대법원-2025-두-34679" → {"court_name": "대법원", "case_number": "2025두34679"}
+            "평택지원-2025-가단-53100" → {"court_name": "평택지원", "case_number": "2025가단53100"}
+            "광주고등법원(전주)-2024-누-1066" → {"court_name": "광주고등법원(전주)", "case_number": "2024누1066"}
+            "서울고등법원2025누6453" → {"court_name": "서울고등법원", "case_number": "2025누6453"}
+            "대전고등법원2025누385" → {"court_name": "대전고등법원", "case_number": "2025누385"}
             "2023다12345" → {"court_name": "", "case_number": "2023다12345"}
             
         Args:
@@ -765,8 +933,15 @@ class LawAPIClient:
         Returns:
             {"court_name": str, "case_number": str}
         """
-        # 패턴 1: "법원명-년도-종류-번호" 형식
-        pattern1 = r'^(.+법원)-(\d{4})-([가-힣]+)-(\d+)$'
+        if not title:
+            return {"court_name": "", "case_number": ""}
+        
+        # 법원/지원 패턴 (대법원, OO법원, OO지원, 괄호 포함)
+        court_pattern = r'(?:법원|대법원|지원)(?:\([^)]+\))?'
+        
+        # 패턴 1: "법원명-년도-종류-번호" 형식 (하이픈으로 구분)
+        # 예: "서울고등법원(인천)-2025-누-10220", "평택지원-2025-가단-53100"
+        pattern1 = rf'^(.+?{court_pattern})-(\d{{4}})-([가-힣]+)-(\d+)$'
         match = re.match(pattern1, title)
         if match:
             court_name = match.group(1)
@@ -776,18 +951,31 @@ class LawAPIClient:
             case_number = f"{year}{case_type}{number}"
             return {"court_name": court_name, "case_number": case_number}
         
-        # 패턴 2: "법원명 년도종류번호" 형식 (공백으로 구분)
-        pattern2 = r'^(.+법원)\s+(\d{4}[가-힣]+\d+)$'
+        # 패턴 2: "법원명년도종류번호" 형식 (하이픈 없이 붙어있음)
+        # 예: "서울고등법원2025누6453", "대전고등법원2025누385"
+        pattern2 = rf'^(.+?{court_pattern})(\d{{4}})([가-힣]+)(\d+)$'
         match = re.match(pattern2, title)
+        if match:
+            court_name = match.group(1)
+            year = match.group(2)
+            case_type = match.group(3)
+            number = match.group(4)
+            case_number = f"{year}{case_type}{number}"
+            return {"court_name": court_name, "case_number": case_number}
+        
+        # 패턴 3: "법원명 년도종류번호" 형식 (공백으로 구분)
+        pattern3 = rf'^(.+?{court_pattern})\s+(\d{{4}}[가-힣]+\d+)$'
+        match = re.match(pattern3, title)
         if match:
             return {"court_name": match.group(1), "case_number": match.group(2)}
         
-        # 패턴 3: 일반 사건번호 "년도종류번호" 형식 (예: 2023다12345 또는 93누1077)
-        pattern3 = r'^(\d{2,4})([가-힣]+)(\d+)$'
-        match = re.match(pattern3, title)
+        # 패턴 4: 순수 사건번호만 "년도종류번호" 형식 (예: 2023다12345, 93누1077)
+        pattern4 = r'^(\d{2,4})([가-힣]+)(\d+)$'
+        match = re.match(pattern4, title)
         if match:
             return {"court_name": "", "case_number": title}
         
+        # 매칭 실패시 원본 반환
         return {"court_name": "", "case_number": title}
     
     @staticmethod

@@ -39,6 +39,12 @@ ETL 파이프라인의 핵심 구현 요구사항입니다.
 |-----------|-----------|
 | `서울고등법원-2022-누-38108` | court_name: `서울고등법원`, case_number: `2022누38108` |
 | `대법원-2025-두-34568` | court_name: `대법원`, case_number: `2025두34568` |
+| `서울고등법원(인천)-2025-누-10220` | court_name: `서울고등법원(인천)`, case_number: `2025누10220` |
+| `광주고등법원(전주)-2024-누-1066` | court_name: `광주고등법원(전주)`, case_number: `2024누1066` |
+| `평택지원-2025-가단-53100` | court_name: `평택지원`, case_number: `2025가단53100` |
+| `안양지원-2024-가단-130342` | court_name: `안양지원`, case_number: `2024가단130342` |
+| `대전고등법원2025누385` | court_name: `대전고등법원`, case_number: `2025누385` |
+| `서울고등법원2025누6453` | court_name: `서울고등법원`, case_number: `2025누6453` |
 | `2023다12345` | court_name: 사건종류코드로 추정, case_number: `2023다12345` |
 | `93누1077` | court_name: `고등법원` (누=행정), case_number: `93누1077` |
 
@@ -96,43 +102,19 @@ graph LR
 ```
 etl/
 ├── __init__.py
-├── config.py                    # ETL 설정
-├── main.py                      # ETL 실행 진입점
-│
-├── api_client/                  # 법제처 API 클라이언트
+├── clients/                     # API 클라이언트
 │   ├── __init__.py
-│   ├── base_client.py           # 공통 HTTP 클라이언트
-│   ├── case_client.py           # 판례 API
-│   ├── constitutional_client.py  # 헌재결정례 API
-│   └── interpretation_client.py  # 법령해석례 API
-│
-├── extractors/                  # 데이터 추출기
-│   ├── __init__.py
-│   ├── base_extractor.py
-│   ├── case_extractor.py
-│   └── batch_extractor.py
-│
-├── transformers/                # 데이터 변환기
-│   ├── __init__.py
-│   ├── xml_parser.py
-│   ├── data_cleaner.py
-│   └── text_processor.py
+│   └── law_api.py               # 법제처 API 클라이언트 (통합)
 │
 ├── loaders/                     # 데이터 적재기
-│   ├── __init__.py
-│   ├── db_loader.py
-│   └── embedding_loader.py
+│   └── __init__.py
 │
-├── pipelines/                   # 파이프라인 정의
-│   ├── __init__.py
-│   ├── case_pipeline.py
-│   ├── constitutional_pipeline.py
-│   └── full_sync_pipeline.py
-│
-└── utils/                       # 유틸리티
-    ├── __init__.py
-    ├── rate_limiter.py
-    └── logger.py
+└── transformers/                # 데이터 변환기
+    └── __init__.py
+
+scripts/
+├── init_db.py                   # DB 초기화
+└── run_etl.py                   # ETL 실행 (수집 + 벡터화)
 ```
 
 ---

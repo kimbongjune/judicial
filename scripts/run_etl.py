@@ -93,7 +93,8 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                     try:
                         print(f"\r    ⏳ 처리 중... ({total_saved + 1}/{total_count:,}건)", end="", flush=True)
                         
-                        detail = await client.get_case_detail(serial_no)
+                        # XML API 시도 → 실패 시 HTML + Selenium fallback
+                        detail = await client.get_case_detail_with_fallback(serial_no)
                         
                         # 사건번호에서 법원명 파싱 (예: "대법원-2025-두-34568" → court_name="대법원", case_number="2025두34568")
                         raw_case_number = item.get("사건번호", "")
@@ -112,6 +113,9 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                         case_number = parsed["case_number"] if parsed["case_number"] else raw_case_number
                         
                         # UPSERT (있으면 업데이트, 없으면 삽입)
+                        # judgment_type: 목록 API "선고" → 상세조회 "선고" → 목록 "판결유형" 순으로 시도
+                        judgment_type = item.get("선고") or detail.get("선고") or item.get("판결유형") or ""
+                        
                         case_data = {
                             "case_serial_number": serial_no,
                             "case_number": case_number,
@@ -119,9 +123,9 @@ async def fetch_and_save_cases(client: LawAPIClient, max_pages: int = None, disp
                             "case_type_name": item.get("사건종류명"),
                             "court_name": court_name,
                             "court_type_code": item.get("법원종류코드"),
-                            "judgment_type": item.get("선고"),
+                            "judgment_type": judgment_type,
                             "case_name": item.get("사건명") or "제목 없음",
-                            "decision_type": detail.get("판결유형"),
+                            "decision_type": detail.get("판결유형") or item.get("판결유형"),
                             "summary": detail.get("판시사항"),
                             "gist": detail.get("판결요지"),
                             "reference_provisions": detail.get("참조조문"),
