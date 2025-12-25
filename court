@@ -1,0 +1,6 @@
+Can't find file (f'[{status}]
+Can't find file {case[:40]:40s}
+Can't find file -
+Can't find file {r[\court_name\]:25s}
+Can't find file case:
+Can't find file {r[\case_number\]}')

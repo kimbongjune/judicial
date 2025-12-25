@@ -578,8 +578,8 @@ class LawAPIClient:
             # 페이지 로드
             driver.get(url)
             
-            # JS 렌더링 대기
-            time.sleep(3)
+            # JS 렌더링 대기 (외부 사이트 리다이렉트 대응)
+            time.sleep(5)
             
             # 동적 콘텐츠 대기 시도
             try:
@@ -721,13 +721,25 @@ class LawAPIClient:
                             if len(date_text) >= 8:
                                 result["선고일자"] = date_text[:8]
         
-        # 참조조문: div.rel_group > div > a 링크들
-        rel_group = soup.find('div', class_='rel_group')
-        if rel_group:
-            links = rel_group.find_all('a', class_='txt_link')
-            refs = [a.get_text(strip=True) for a in links]
-            if refs:
-                result["참조조문"] = ', '.join(refs)
+        # 참조조문: '관련 법령' 섹션에서만 추출 (관련 주제어 제외)
+        rel_groups = soup.find_all('div', class_='rel_group')
+        for rel_group in rel_groups:
+            # 라벨 확인 (관련 법령인지)
+            span = rel_group.find('span')
+            if span and '법령' in span.get_text(strip=True):
+                links = rel_group.find_all('a', class_='txt_link')
+                refs = []
+                for link in links:
+                    # title 속성이 있으면 사용 (더 완전한 정보), 없으면 텍스트
+                    ref_text = link.get('title') or link.get_text(strip=True)
+                    if ref_text:
+                        # '새창열림' 등 불필요 텍스트 제거
+                        ref_text = ref_text.replace('새창열림', '').strip()
+                        if ref_text:
+                            refs.append(ref_text)
+                if refs:
+                    result["참조조문"] = ', '.join(refs)
+                break
         
         # 요지 (판결요지): div[data-center-type="body_content_gist"]
         gist_div = soup.find('div', {'data-center-type': 'body_content_gist'})
@@ -751,6 +763,79 @@ class LawAPIClient:
             full_content = html_cntn.get_text(separator='\n', strip=True)
             if full_content and len(full_content) > len(result.get("판례내용", "")):
                 result["판례내용"] = full_content[:15000]  # 최대 15000자
+        
+        # ========================================
+        # bo_body_cont 컨테이너 기반 텍스트 파싱
+        # ========================================
+        bo_body_cont = soup.find('div', class_='bo_body_cont')
+        if bo_body_cont:
+            full_text = bo_body_cont.get_text(separator='\n', strip=True)
+            
+            # 사건번호 fallback (공백 포함: "사 건 2021두59908")
+            if not result["사건번호"]:
+                case_patterns = [
+                    r'사\s*건\s*(\d{4}[가-힣]+\d+)',
+                    r'(\d{4}[가-힣]+\d+)',
+                ]
+                for pattern in case_patterns:
+                    match = re.search(pattern, full_text)
+                    if match:
+                        result["사건번호"] = match.group(1)
+                        break
+            
+            # 판결요지 fallback (요지 섹션에서 추출)
+            if not result["판결요지"]:
+                # 다양한 패턴 시도
+                gist_patterns = [
+                    r'요\s*지\s*\n(.+?)(?=\n판결내용|\n판\s*결\s*내용|\n상세내용|$)',  # 요지 → 판결내용/상세내용
+                    r'요\s*지\s*(.+?)(?=주\s*문|사\s*건|$)',  # 요지 → 주문/사건
+                ]
+                for pattern in gist_patterns:
+                    match = re.search(pattern, full_text, re.DOTALL)
+                    if match:
+                        gist_text = match.group(1).strip()
+                        if len(gist_text) > 20:
+                            result["판결요지"] = gist_text[:3000]
+                            break
+            
+            # 판례내용 fallback (주문 + 이유 또는 상세내용)
+            if not result["판례내용"]:
+                content_parts = []
+                
+                # 방법 1: '사 건'으로 시작하는 본문 전체 추출
+                # "판결 내용은 붙임과 같습니다" 다음에 오는 본문
+                case_start_match = re.search(r'사\s*건\s*\n(.+)', full_text, re.DOTALL)
+                if case_start_match:
+                    content_text = "사 건\n" + case_start_match.group(1).strip()
+                    if len(content_text) > 100:
+                        result["판례내용"] = content_text[:15000]
+                
+                # 방법 2: 상세내용 이후 전문
+                if not result["판례내용"]:
+                    detail_match = re.search(r'상세내용.+?(사\s*건.+)', full_text, re.DOTALL)
+                    if detail_match:
+                        content_text = detail_match.group(1).strip()
+                        if len(content_text) > 100:
+                            result["판례내용"] = content_text[:15000]
+                
+                # 방법 3: 주문 + 이유 (개행 없이도 매칭)
+                if not result["판례내용"]:
+                    # 주 문 찾기 (공백 포함, 개행 유연)
+                    jumun_match = re.search(r'주\s*문\s*(.+?)(?:이\s*유|청\s*구\s*취\s*지|$)', full_text, re.DOTALL)
+                    if jumun_match:
+                        jumun_text = jumun_match.group(1).strip()
+                        if len(jumun_text) > 10:
+                            content_parts.append("【주문】\n" + jumun_text)
+                    
+                    # 이 유 찾기 (공백 포함)
+                    iyu_match = re.search(r'이\s*유\s*(.+)', full_text, re.DOTALL)
+                    if iyu_match:
+                        iyu_text = iyu_match.group(1).strip()
+                        if len(iyu_text) > 50:
+                            content_parts.append("【이유】\n" + iyu_text[:10000])
+                    
+                    if content_parts:
+                        result["판례내용"] = '\n\n'.join(content_parts)
         
         # 법원명 추출: 사건번호에서 또는 텍스트에서
         if result["사건번호"]:
@@ -834,7 +919,7 @@ class LawAPIClient:
             "판례내용": "",
         }
         
-        # === 법제처 페이지 파싱 ===
+        # === 방법 1: 법제처 페이지 파싱 (기존 셀렉터) ===
         
         # 사건명
         precNm = soup.find('input', {'id': 'precNm'})
@@ -863,37 +948,38 @@ class LawAPIClient:
         # 본문 컨테이너 찾기
         trial_section = soup.find('div', {'class': 'trial-section', 'data-prec-seq': str(case_serial_number)})
         con_scroll = soup.find('div', {'id': 'conScroll'})
-        container = trial_section or con_scroll or soup
+        bo_body_cont = soup.find('div', class_='bo_body_cont')  # 새로운 컨테이너
+        container = trial_section or con_scroll or bo_body_cont or soup
         
-        # 판시사항
+        # 판시사항 (h4 ID 방식)
         sa = container.find('h4', {'id': f'sa-{case_serial_number}'})
         if sa:
             p = sa.find_next_sibling('p', class_='pty4')
             if p:
                 result["판시사항"] = p.get_text(separator='\n', strip=True)
         
-        # 판결요지
+        # 판결요지 (h4 ID 방식)
         yo = container.find('h4', {'id': f'yo-{case_serial_number}'})
         if yo:
             p = yo.find_next_sibling('p', class_='pty4')
             if p:
                 result["판결요지"] = p.get_text(separator='\n', strip=True)
         
-        # 참조조문
+        # 참조조문 (h4 ID 방식)
         jo = container.find('h4', {'id': f'conLsJo-{case_serial_number}'})
         if jo:
             p = jo.find_next_sibling('p', class_='pty4')
             if p:
                 result["참조조문"] = p.get_text(separator='\n', strip=True)
         
-        # 참조판례
+        # 참조판례 (h4 ID 방식)
         prec = container.find('h4', {'id': f'conPrec-{case_serial_number}'})
         if prec:
             p = prec.find_next_sibling('p', class_='pty4')
             if p:
                 result["참조판례"] = p.get_text(separator='\n', strip=True)
         
-        # 전문
+        # 전문 (h4 ID 방식)
         jun = container.find('h4', {'id': f'jun-{case_serial_number}'})
         if jun:
             parts = []
@@ -904,6 +990,88 @@ class LawAPIClient:
                     break
                 parts.append(sib.get_text(separator='\n', strip=True))
             result["판례내용"] = '\n'.join(filter(None, parts))
+        
+        # === 방법 2: bo_body_cont 컨테이너에서 텍스트 기반 파싱 ===
+        if bo_body_cont and not result["판례내용"]:
+            full_text = bo_body_cont.get_text(separator='\n', strip=True)
+            
+            # 사건번호 추출
+            if not result["사건번호"]:
+                case_match = re.search(r'사\s*건\s*(\d{4}[가-힣]+\d+)', full_text)
+                if case_match:
+                    result["사건번호"] = case_match.group(1)
+            
+            # 주문 + 이유 추출 (판례내용)
+            content_parts = []
+            
+            # 주문 찾기
+            jumun_match = re.search(r'주\s*문(.+?)(?:이\s*유|$)', full_text, re.DOTALL)
+            if jumun_match:
+                content_parts.append("【주문】\n" + jumun_match.group(1).strip())
+            
+            # 이유 찾기
+            iyu_match = re.search(r'이\s*유(.+)', full_text, re.DOTALL)
+            if iyu_match:
+                content_parts.append("【이유】\n" + iyu_match.group(1).strip()[:10000])
+            
+            if content_parts:
+                result["판례내용"] = '\n\n'.join(content_parts)
+        
+        # === 방법 3: 전체 텍스트 기반 fallback ===
+        full_text = soup.get_text(separator='\n', strip=True)
+        
+        # 사건명 fallback
+        if not result["사건명"]:
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text(strip=True)
+                if title_text and len(title_text) < 200:
+                    result["사건명"] = title_text
+        
+        # 사건번호 fallback
+        if not result["사건번호"]:
+            case_match = re.search(r'(\d{4}[가-힣]+\d+)', full_text)
+            if case_match:
+                result["사건번호"] = case_match.group(1)
+        
+        # 선고일자 fallback
+        if not result["선고일자"]:
+            date_patterns = [
+                r'선고일자[:\s-]*(\d{4})\.?(\d{1,2})\.?(\d{1,2})',
+                r'(\d{4})\.(\d{1,2})\.(\d{1,2})\.?\s*선고',
+            ]
+            for pattern in date_patterns:
+                match = re.search(pattern, full_text)
+                if match:
+                    result["선고일자"] = f"{match.group(1)}{match.group(2).zfill(2)}{match.group(3).zfill(2)}"
+                    break
+        
+        # 판결요지 fallback (【요지】 또는 요지 텍스트)
+        if not result["판결요지"]:
+            gist_patterns = [
+                r'【요지】\s*(.+?)(?=【|$)',
+                r'요\s*지\s*(.+?)(?=주\s*문|판결내용|$)',
+            ]
+            for pattern in gist_patterns:
+                match = re.search(pattern, full_text, re.DOTALL)
+                if match:
+                    gist_text = match.group(1).strip()
+                    if len(gist_text) > 20:
+                        result["판결요지"] = gist_text[:3000]
+                        break
+        
+        # 판례내용 fallback
+        if not result["판례내용"]:
+            content_patterns = [
+                r'주\s*문\s*(.+)',
+                r'【판결문】\s*(.+)',
+                r'【판결내용】\s*(.+)',
+            ]
+            for pattern in content_patterns:
+                match = re.search(pattern, full_text, re.DOTALL)
+                if match:
+                    result["판례내용"] = match.group(1).strip()[:15000]
+                    break
         
         return result
     
@@ -960,11 +1128,10 @@ class LawAPIClient:
             "서울고등법원-2022-누-38108" → {"court_name": "서울고등법원", "case_number": "2022누38108"}
             "서울고등법원(인천)-2025-누-10220" → {"court_name": "서울고등법원(인천)", "case_number": "2025누10220"}
             "대법원-2025-두-34679" → {"court_name": "대법원", "case_number": "2025두34679"}
-            "평택지원-2025-가단-53100" → {"court_name": "평택지원", "case_number": "2025가단53100"}
-            "광주고등법원(전주)-2024-누-1066" → {"court_name": "광주고등법원(전주)", "case_number": "2024누1066"}
-            "서울고등법원2025누6453" → {"court_name": "서울고등법원", "case_number": "2025누6453"}
-            "대전고등법원2025누385" → {"court_name": "대전고등법원", "case_number": "2025누385"}
-            "2023다12345" → {"court_name": "", "case_number": "2023다12345"}
+            "대법원2025다210731 (2025.5.15)" → {"court_name": "대법원", "case_number": "2025다210731"}
+            "수원지방법원-2024나70449" → {"court_name": "수원지방법원", "case_number": "2024나70449"}
+            "춘천지방법원-20274-구합*318" → {"court_name": "춘천지방법원", "case_number": "2024구합318"}
+            "의정부지방법원남양주지원2023가단42925" → {"court_name": "의정부지방법원남양주지원", "case_number": "2023가단42925"}
             
         Args:
             title: 판례 제목 또는 사건번호 문자열
@@ -975,13 +1142,31 @@ class LawAPIClient:
         if not title:
             return {"court_name": "", "case_number": ""}
         
+        # === 전처리 ===
+        processed = title.strip()
+        
+        # 1. 괄호 날짜 제거: (2025.5.15), (2025. 2. 26), (2025.5.13.) 등
+        processed = re.sub(r'\s*\(\d{4}[\.\s\d]+\)\.?$', '', processed)
+        
+        # 2. 특수문자 정규화: * → 빈문자열
+        processed = processed.replace('*', '')
+        
+        # 3. 연도 오타 수정: 5자리 연도 → 4자리 (20274 → 2024)
+        # 하이픈 뒤에 5자리 숫자가 오는 경우: 앞 4자리만 취함
+        processed = re.sub(r'-(\d{4})\d(?=-|[가-힣])', r'-\1', processed)
+        
+        # === 패턴 매칭 ===
+        
+        # 4. 사건명 제거: 숫자 뒤에 공백+한글 사건명 (예: "402000 사해행위취소")
+        processed = re.sub(r'(\d+)\s+[가-힣]+$', r'\1', processed)
+        
         # 법원/지원 패턴 (대법원, OO법원, OO지원, 괄호 포함)
         court_pattern = r'(?:법원|대법원|지원)(?:\([^)]+\))?'
         
-        # 패턴 1: "법원명-년도-종류-번호" 형식 (하이픈으로 구분)
-        # 예: "서울고등법원(인천)-2025-누-10220", "평택지원-2025-가단-53100"
-        pattern1 = rf'^(.+?{court_pattern})-(\d{{4}})-([가-힣]+)-(\d+)$'
-        match = re.match(pattern1, title)
+        # 패턴 1: "법원명-년도-종류-번호" 형식 (하이픈 3개)
+        # 예: "서울고등법원(인천)-2025-누-10220", "제주지방법원-2024-가합-12350"
+        pattern1 = rf'^(.+?{court_pattern})[-\s]+(\d{{4}})[-\s]+([가-힣]+)[-\s]+(\d+)$'
+        match = re.match(pattern1, processed)
         if match:
             court_name = match.group(1)
             year = match.group(2)
@@ -990,10 +1175,10 @@ class LawAPIClient:
             case_number = f"{year}{case_type}{number}"
             return {"court_name": court_name, "case_number": case_number}
         
-        # 패턴 2: "법원명년도종류번호" 형식 (하이픈 없이 붙어있음)
-        # 예: "서울고등법원2025누6453", "대전고등법원2025누385"
-        pattern2 = rf'^(.+?{court_pattern})(\d{{4}})([가-힣]+)(\d+)$'
-        match = re.match(pattern2, title)
+        # 패턴 2: "법원명-년도종류번호" 형식 (하이픈 1개)
+        # 예: "수원지방법원-2024나70449"
+        pattern2 = rf'^(.+?{court_pattern})[-\s]+(\d{{4}})([가-힣]+)(\d+)$'
+        match = re.match(pattern2, processed)
         if match:
             court_name = match.group(1)
             year = match.group(2)
@@ -1002,20 +1187,56 @@ class LawAPIClient:
             case_number = f"{year}{case_type}{number}"
             return {"court_name": court_name, "case_number": case_number}
         
-        # 패턴 3: "법원명 년도종류번호" 형식 (공백으로 구분)
-        pattern3 = rf'^(.+?{court_pattern})\s+(\d{{4}}[가-힣]+\d+)$'
-        match = re.match(pattern3, title)
+        # 패턴 3: "법원명 지원명년도종류번호" 또는 "법원명지원명년도종류번호" 형식
+        # 예: "수원지방법원 안양지원-2023가단-105196", "의정부지방법원남양주지원2023가단42925"
+        pattern3 = rf'^(.+?(?:법원|대법원))\s*(.+?지원)[-\s]*(\d{{4}})[-\s]*([가-힣]+)[-\s]*(\d+)$'
+        match = re.match(pattern3, processed)
+        if match:
+            court_name = f"{match.group(1)}{match.group(2)}"
+            year = match.group(3)
+            case_type = match.group(4)
+            number = match.group(5)
+            case_number = f"{year}{case_type}{number}"
+            return {"court_name": court_name, "case_number": case_number}
+        
+        # 패턴 4: "법원명년도종류번호" 형식 (하이픈 없이 붙어있음)
+        # 예: "대법원2025다210731", "서울중앙지방법원2024가단5254618"
+        pattern4 = rf'^(.+?{court_pattern})(\d{{4}})([가-힣]+)(\d+)$'
+        match = re.match(pattern4, processed)
+        if match:
+            court_name = match.group(1)
+            year = match.group(2)
+            case_type = match.group(3)
+            number = match.group(4)
+            case_number = f"{year}{case_type}{number}"
+            return {"court_name": court_name, "case_number": case_number}
+        
+        # 패턴 5: "법원명-년도-종류번호" 형식 (하이픈 2개, 종류번호 붙어있음)
+        # 예: "수원지방법원 안양지원-2023가단-105196"
+        pattern5 = rf'^(.+?)[-\s]+(\d{{4}})([가-힣]+)[-\s]*(\d+)$'
+        match = re.match(pattern5, processed)
+        if match:
+            court_name = match.group(1).strip()
+            year = match.group(2)
+            case_type = match.group(3)
+            number = match.group(4)
+            case_number = f"{year}{case_type}{number}"
+            return {"court_name": court_name, "case_number": case_number}
+        
+        # 패턴 6: "법원명 년도종류번호" 형식 (공백으로 구분)
+        pattern6 = rf'^(.+?{court_pattern})\s+(\d{{4}}[가-힣]+\d+)$'
+        match = re.match(pattern6, processed)
         if match:
             return {"court_name": match.group(1), "case_number": match.group(2)}
         
-        # 패턴 4: 순수 사건번호만 "년도종류번호" 형식 (예: 2023다12345, 93누1077)
-        pattern4 = r'^(\d{2,4})([가-힣]+)(\d+)$'
-        match = re.match(pattern4, title)
+        # 패턴 7: 순수 사건번호만 "년도종류번호" 형식 (예: 2023다12345, 93누1077)
+        pattern7 = r'^(\d{2,4})([가-힣]+)(\d+)$'
+        match = re.match(pattern7, processed)
         if match:
-            return {"court_name": "", "case_number": title}
+            return {"court_name": "", "case_number": processed}
         
-        # 매칭 실패시 원본 반환
-        return {"court_name": "", "case_number": title}
+        # 매칭 실패시 전처리된 값 반환
+        return {"court_name": "", "case_number": processed}
     
     @staticmethod
     def extract_court_from_case_number(case_number: str, default_court: str = "") -> str:
